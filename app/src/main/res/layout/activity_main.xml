@@ -1,0 +1,88 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.constraintlayout.widget.ConstraintLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="#000000"
+    android:padding="24dp">
+
+    <!-- Status dot -->
+    <TextView
+        android:id="@+id/tvDot"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="●"
+        android:textSize="32sp"
+        android:textColor="#FF4444"
+        android:fontFamily="monospace"
+        app:layout_constraintTop_toTopOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        android:layout_marginTop="64dp" />
+
+    <!-- Status label -->
+    <TextView
+        android:id="@+id/tvStatus"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="@string/disconnected"
+        android:textSize="16sp"
+        android:textColor="#666666"
+        android:fontFamily="monospace"
+        android:letterSpacing="0.1"
+        app:layout_constraintTop_toBottomOf="@id/tvDot"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        android:layout_marginTop="12dp" />
+
+    <!-- IP input -->
+    <EditText
+        android:id="@+id/etIp"
+        android:layout_width="0dp"
+        android:layout_height="56dp"
+        android:hint="@string/hint_ip"
+        android:inputType="textUri"
+        android:fontFamily="monospace"
+        android:textColor="#00FF00"
+        android:textColorHint="#666666"
+        android:background="#111111"
+        android:paddingStart="16dp"
+        android:paddingEnd="16dp"
+        android:textSize="16sp"
+        app:layout_constraintTop_toBottomOf="@id/tvStatus"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        android:layout_marginTop="64dp" />
+
+    <!-- Connect button -->
+    <Button
+        android:id="@+id/btnConnect"
+        android:layout_width="0dp"
+        android:layout_height="56dp"
+        android:text="@string/btn_connect"
+        android:textAllCaps="true"
+        android:textColor="#00FF00"
+        android:textSize="16sp"
+        android:fontFamily="monospace"
+        android:background="#111111"
+        app:layout_constraintTop_toBottomOf="@id/etIp"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        android:layout_marginTop="12dp" />
+
+    <!-- Phase 2 placeholder -->
+    <TextView
+        android:id="@+id/tvPhase2Placeholder"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="[ FASE 2 ]"
+        android:textSize="14sp"
+        android:textColor="#666666"
+        android:fontFamily="monospace"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        android:layout_marginBottom="48dp" />
+
+</androidx.constraintlayout.widget.ConstraintLayout>

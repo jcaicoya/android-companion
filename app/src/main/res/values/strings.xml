@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">CuarzoPolar</string>
+    <string name="connected">ENLACE ACTIVO</string>
+    <string name="disconnected">SIN ENLACE</string>
+    <string name="connecting">CONECTANDO…</string>
+    <string name="btn_connect">CONECTAR</string>
+    <string name="btn_disconnect">DESCONECTAR</string>
+    <string name="hint_ip">IP del servidor  (ej. 192.168.1.10)</string>
+</resources>
