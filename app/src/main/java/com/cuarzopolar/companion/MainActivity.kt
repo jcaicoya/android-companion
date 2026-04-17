@@ -16,14 +16,17 @@ import kotlinx.coroutines.launch
 class MainActivity : AppCompatActivity() {
 
     private lateinit var binding: ActivityMainBinding
-    private val wsManager     = WebSocketManager()
-    private val commandHandler = CommandHandler()
-    private val dispatcher     = MessageDispatcher(commandHandler)
+    private val wsManager = WebSocketManager()
+    private lateinit var commandHandler: CommandHandler
+    private lateinit var dispatcher: MessageDispatcher
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         binding = ActivityMainBinding.inflate(layoutInflater)
         setContentView(binding.root)
+
+        commandHandler = CommandHandler(applicationContext)
+        dispatcher     = MessageDispatcher(commandHandler)
 
         // Restore saved IP
         val prefs = getSharedPreferences("companion_prefs", Context.MODE_PRIVATE)
@@ -42,6 +45,11 @@ class MainActivity : AppCompatActivity() {
                 wsManager.connect(ip)
             }
         }
+
+        // Rehearsal test buttons
+        binding.btnTestVibrate.setOnClickListener   { commandHandler.testVibrate()   }
+        binding.btnTestSound.setOnClickListener     { commandHandler.testSound()     }
+        binding.btnTestRedScreen.setOnClickListener { commandHandler.testRedScreen() }
 
         // Observe connection state
         lifecycleScope.launch {

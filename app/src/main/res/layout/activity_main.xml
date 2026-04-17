@@ -74,18 +74,69 @@
         app:layout_constraintEnd_toEndOf="parent"
         android:layout_marginTop="12dp" />
 
-    <!-- Phase 2 placeholder -->
+    <!-- Test buttons (rehearsal) -->
     <TextView
-        android:id="@+id/tvPhase2Placeholder"
+        android:id="@+id/tvTestLabel"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:text="[ FASE 2 ]"
-        android:textSize="14sp"
-        android:textColor="#666666"
+        android:text="ENSAYO"
+        android:textSize="11sp"
+        android:textColor="#444444"
         android:fontFamily="monospace"
+        android:letterSpacing="0.15"
+        app:layout_constraintBottom_toTopOf="@id/btnTestVibrate"
+        app:layout_constraintStart_toStartOf="parent"
+        android:layout_marginBottom="8dp" />
+
+    <Button
+        android:id="@+id/btnTestVibrate"
+        style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+        android:layout_width="0dp"
+        android:layout_height="50dp"
+        android:text="VIBRAR"
+        android:textColor="#FFAA00"
+        android:textSize="13sp"
+        android:fontFamily="monospace"
+        app:strokeColor="#FFAA00"
+        app:strokeWidth="1dp"
+        app:backgroundTint="#111111"
+        app:layout_constraintBottom_toTopOf="@id/btnTestSound"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        android:layout_marginBottom="8dp" />
+
+    <Button
+        android:id="@+id/btnTestSound"
+        style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+        android:layout_width="0dp"
+        android:layout_height="50dp"
+        android:text="SONIDO"
+        android:textColor="#00AAFF"
+        android:textSize="13sp"
+        android:fontFamily="monospace"
+        app:strokeColor="#00AAFF"
+        app:strokeWidth="1dp"
+        app:backgroundTint="#111111"
+        app:layout_constraintBottom_toTopOf="@id/btnTestRedScreen"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        android:layout_marginBottom="8dp" />
+
+    <Button
+        android:id="@+id/btnTestRedScreen"
+        style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+        android:layout_width="0dp"
+        android:layout_height="50dp"
+        android:text="PANTALLA ROJA"
+        android:textColor="#FF4444"
+        android:textSize="13sp"
+        android:fontFamily="monospace"
+        app:strokeColor="#FF4444"
+        app:strokeWidth="1dp"
+        app:backgroundTint="#111111"
         app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintEnd_toEndOf="parent"
-        android:layout_marginBottom="48dp" />
+        android:layout_marginBottom="32dp" />
 
 </androidx.constraintlayout.widget.ConstraintLayout>
