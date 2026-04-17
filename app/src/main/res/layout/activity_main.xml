@@ -58,6 +58,7 @@
     <!-- Connect button -->
     <Button
         android:id="@+id/btnConnect"
+        style="@style/Widget.MaterialComponents.Button.OutlinedButton"
         android:layout_width="0dp"
         android:layout_height="56dp"
         android:text="@string/btn_connect"
@@ -65,7 +66,9 @@
         android:textColor="#00FF00"
         android:textSize="16sp"
         android:fontFamily="monospace"
-        android:background="#111111"
+        app:strokeColor="#00FF00"
+        app:strokeWidth="1dp"
+        app:backgroundTint="#111111"
         app:layout_constraintTop_toBottomOf="@id/etIp"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintEnd_toEndOf="parent"

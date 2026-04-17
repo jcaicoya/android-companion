@@ -1,11 +1,14 @@
 package com.cuarzopolar.companion.network
 
 import android.os.Build
+import android.util.Log
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import okhttp3.*
 import org.json.JSONObject
+
+private const val TAG = "WSManager"
 
 enum class ConnectionState { DISCONNECTED, CONNECTING, CONNECTED }
 
@@ -31,16 +34,19 @@ class WebSocketManager {
     }
 
     private fun doConnect(ip: String, port: Int) {
+        Log.d(TAG, "Connecting to ws://$ip:$port")
         _state.value = ConnectionState.CONNECTING
         val request = Request.Builder().url("ws://$ip:$port").build()
         webSocket = client.newWebSocket(request, object : WebSocketListener() {
             override fun onOpen(ws: WebSocket, response: Response) {
+                Log.d(TAG, "Connected to ws://$ip:$port")
                 _state.value = ConnectionState.CONNECTED
                 reconnectDelay = 1000L
                 val deviceName = Build.MODEL
                 ws.send("""{"type":"status","deviceName":"$deviceName"}""")
             }
             override fun onMessage(ws: WebSocket, text: String) {
+                Log.d(TAG, "Message received: $text")
                 val json = JSONObject(text)
                 if (json.optString("type") == "ping") {
                     ws.send("""{"type":"pong"}""")
@@ -49,13 +55,16 @@ class WebSocketManager {
                 }
             }
             override fun onMessage(ws: WebSocket, bytes: okio.ByteString) {
+                Log.d(TAG, "Binary received: ${bytes.size} bytes")
                 onBinaryMessage?.invoke(bytes.toByteArray())
             }
             override fun onFailure(ws: WebSocket, t: Throwable, response: Response?) {
+                Log.e(TAG, "Connection failed: ${t::class.simpleName}: ${t.message}")
                 _state.value = ConnectionState.DISCONNECTED
                 scheduleReconnect(ip, port)
             }
             override fun onClosed(ws: WebSocket, code: Int, reason: String) {
+                Log.d(TAG, "Connection closed: $code $reason")
                 _state.value = ConnectionState.DISCONNECTED
                 scheduleReconnect(ip, port)
             }
