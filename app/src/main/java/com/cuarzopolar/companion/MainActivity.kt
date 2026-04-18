@@ -19,6 +19,8 @@ import com.cuarzopolar.companion.databinding.ActivityMainBinding
 import com.cuarzopolar.companion.network.ConnectionState
 import com.cuarzopolar.companion.network.MessageDispatcher
 import com.cuarzopolar.companion.network.WebSocketManager
+import com.cuarzopolar.companion.network.UdpDiscovery
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 
@@ -33,6 +35,7 @@ class MainActivity : AppCompatActivity() {
 
     private var micActive = false
     private var awaitingPhoto = false
+    private var discoveryJob: Job? = null
 
     // Permission launchers
     private val requestMicPermission = registerForActivityResult(
@@ -127,6 +130,9 @@ class MainActivity : AppCompatActivity() {
             binding.ivPhoto.visibility = View.GONE
         }
 
+        // UDP auto-discovery: listen for Qt beacon and connect automatically
+        startDiscovery()
+
         // Observe connection state
         lifecycleScope.launch {
             wsManager.connectionState.collectLatest { state ->
@@ -135,6 +141,7 @@ class MainActivity : AppCompatActivity() {
                         binding.tvDot.setTextColor(Color.parseColor("#00FF00"))
                         binding.tvStatus.text = getString(R.string.connected)
                         binding.btnConnect.text = getString(R.string.btn_disconnect)
+                        discoveryJob?.cancel()  // stop looking once connected
                     }
                     ConnectionState.CONNECTING -> {
                         binding.tvDot.setTextColor(Color.parseColor("#FFAA00"))
@@ -145,8 +152,27 @@ class MainActivity : AppCompatActivity() {
                         binding.tvDot.setTextColor(Color.parseColor("#FF4444"))
                         binding.tvStatus.text = getString(R.string.disconnected)
                         binding.btnConnect.text = getString(R.string.btn_connect)
+                        startDiscovery()  // resume looking after a drop
                     }
                 }
+            }
+        }
+    }
+
+    private fun startDiscovery() {
+        discoveryJob?.cancel()
+        discoveryJob = lifecycleScope.launch {
+            try {
+                val beacon = UdpDiscovery.awaitBeacon()
+                // Only auto-connect if not already connected
+                if (wsManager.connectionState.value == ConnectionState.DISCONNECTED) {
+                    binding.etIp.setText(beacon.ip)
+                    getSharedPreferences("companion_prefs", MODE_PRIVATE)
+                        .edit().putString("last_ip", beacon.ip).apply()
+                    wsManager.connect(beacon.ip)
+                }
+            } catch (_: Exception) {
+                // Cancelled or socket error — silently ignore
             }
         }
     }
