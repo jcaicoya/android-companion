@@ -157,9 +157,6 @@ class MainActivity : AppCompatActivity() {
             binding.ivPhoto.visibility = View.GONE
         }
 
-        // UDP auto-discovery: listen for Qt beacon and connect automatically
-        startDiscovery()
-
         // Observe connection state
         lifecycleScope.launch {
             wsManager.connectionState.collectLatest { state ->

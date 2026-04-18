@@ -1,11 +1,14 @@
 package com.cuarzopolar.companion.network
 
 import android.util.Log
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.withContext
 import org.json.JSONObject
 import java.net.DatagramPacket
 import java.net.DatagramSocket
+import java.net.SocketTimeoutException
 
 object UdpDiscovery {
 
@@ -15,17 +18,24 @@ object UdpDiscovery {
 
     data class Beacon(val ip: String, val port: Int)
 
-    // Blocks until a beacon is received or the socket is closed.
-    // Call from a coroutine; cancel the coroutine to stop listening.
+    // Listens for a Qt beacon and returns when one is found.
+    // Responds correctly to coroutine cancellation: soTimeout=3000 lets
+    // the loop wake up periodically so isActive checks can fire, and the
+    // finally block closes the socket so the port is released immediately.
     suspend fun awaitBeacon(): Beacon = withContext(Dispatchers.IO) {
-        DatagramSocket(BEACON_PORT).use { socket ->
+        val socket = DatagramSocket(BEACON_PORT)
+        try {
             socket.broadcast = true
-            socket.soTimeout = 0  // wait indefinitely
+            socket.soTimeout = 3000  // wake up every 3 s to check isActive
             Log.d(TAG, "Listening for beacon on UDP $BEACON_PORT")
             val buf = ByteArray(BUFFER_SIZE)
             val packet = DatagramPacket(buf, buf.size)
-            while (true) {
-                socket.receive(packet)
+            while (isActive) {
+                try {
+                    socket.receive(packet)
+                } catch (_: SocketTimeoutException) {
+                    continue  // just re-check isActive
+                }
                 val msg = String(packet.data, 0, packet.length)
                 Log.d(TAG, "Received: $msg")
                 try {
@@ -36,12 +46,14 @@ object UdpDiscovery {
                         Log.d(TAG, "Beacon from $ip:$port")
                         return@withContext Beacon(ip, port)
                     }
-                } catch (e: Exception) {
+                } catch (_: Exception) {
                     Log.w(TAG, "Malformed beacon: $msg")
                 }
             }
-            @Suppress("UNREACHABLE_CODE")
-            error("unreachable")
+            throw CancellationException()
+        } finally {
+            socket.close()  // always release the port, even on cancellation
+            Log.d(TAG, "Socket closed")
         }
     }
 }
