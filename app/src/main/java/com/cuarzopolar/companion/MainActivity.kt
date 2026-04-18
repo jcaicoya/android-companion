@@ -14,6 +14,7 @@ import androidx.core.content.ContextCompat
 import androidx.lifecycle.lifecycleScope
 import com.cuarzopolar.companion.capture.CameraCapture
 import com.cuarzopolar.companion.capture.SpeechManager
+import com.cuarzopolar.companion.capture.VideoStreamManager
 import com.cuarzopolar.companion.commands.CommandHandler
 import com.cuarzopolar.companion.databinding.ActivityMainBinding
 import com.cuarzopolar.companion.network.ConnectionState
@@ -32,6 +33,7 @@ class MainActivity : AppCompatActivity() {
     private lateinit var dispatcher: MessageDispatcher
     private lateinit var speechManager: SpeechManager
     private lateinit var cameraCapture: CameraCapture
+    private lateinit var videoStreamManager: VideoStreamManager
 
     private var micActive = false
     private var awaitingPhoto = false
@@ -47,7 +49,7 @@ class MainActivity : AppCompatActivity() {
     private val requestCameraPermission = registerForActivityResult(
         ActivityResultContracts.RequestPermission()
     ) { granted ->
-        if (granted) cameraCapture.bindCamera { takePhoto() }
+        if (granted) cameraCapture.bindCamera(videoStreamManager.imageAnalysis) { takePhoto() }
         else toast("Permiso de cámara denegado")
     }
 
@@ -66,10 +68,15 @@ class MainActivity : AppCompatActivity() {
             runOnUiThread { binding.tvTranscript.text = transcript }
         }
 
+        videoStreamManager = VideoStreamManager { jpegBytes ->
+            if (wsManager.connectionState.value == ConnectionState.CONNECTED) {
+                wsManager.sendBinary(jpegBytes)
+            }
+        }
         cameraCapture = CameraCapture(this, this)
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA)
                 == PackageManager.PERMISSION_GRANTED) {
-            cameraCapture.bindCamera {}
+            cameraCapture.bindCamera(videoStreamManager.imageAnalysis) {}
         }
 
         // Handle incoming binary frames (transformed photo from Qt)
@@ -86,8 +93,23 @@ class MainActivity : AppCompatActivity() {
         val prefs = getSharedPreferences("companion_prefs", Context.MODE_PRIVATE)
         binding.etIp.setText(prefs.getString("last_ip", ""))
 
-        // Route incoming text messages
-        wsManager.onTextMessage = { dispatcher.dispatch(it) }
+        // Route incoming text messages, intercepting stream commands
+        wsManager.onTextMessage = { msg ->
+            try {
+                val obj = org.json.JSONObject(msg)
+                if (obj.optString("type") == "command") {
+                    when (obj.optString("action")) {
+                        "startStream" -> runOnUiThread { activateStream() }
+                        "stopStream"  -> runOnUiThread { deactivateStream() }
+                        else          -> dispatcher.dispatch(msg)
+                    }
+                } else {
+                    dispatcher.dispatch(msg)
+                }
+            } catch (_: Exception) {
+                dispatcher.dispatch(msg)
+            }
+        }
 
         // Connection button
         binding.btnConnect.setOnClickListener {
@@ -125,6 +147,11 @@ class MainActivity : AppCompatActivity() {
             }
         }
 
+        // Video stream toggle
+        binding.btnVideo.setOnClickListener {
+            if (videoStreamManager.isStreaming()) deactivateStream() else activateStream()
+        }
+
         // Dismiss transformed photo on tap
         binding.ivPhoto.setOnClickListener {
             binding.ivPhoto.visibility = View.GONE
@@ -141,6 +168,9 @@ class MainActivity : AppCompatActivity() {
                         binding.tvDot.setTextColor(Color.parseColor("#00FF00"))
                         binding.tvStatus.text = getString(R.string.connected)
                         binding.btnConnect.text = getString(R.string.btn_disconnect)
+                        binding.btnMic.isEnabled = true
+                        binding.btnPhoto.isEnabled = true
+                        binding.btnVideo.isEnabled = true
                         discoveryJob?.cancel()  // stop looking once connected
                     }
                     ConnectionState.CONNECTING -> {
@@ -152,6 +182,11 @@ class MainActivity : AppCompatActivity() {
                         binding.tvDot.setTextColor(Color.parseColor("#FF4444"))
                         binding.tvStatus.text = getString(R.string.disconnected)
                         binding.btnConnect.text = getString(R.string.btn_connect)
+                        binding.btnMic.isEnabled = false
+                        binding.btnPhoto.isEnabled = false
+                        binding.btnVideo.isEnabled = false
+                        if (videoStreamManager.isStreaming()) deactivateStream()
+                        if (micActive) { micActive = false; speechManager.stop() }
                         startDiscovery()  // resume looking after a drop
                     }
                 }
@@ -209,6 +244,20 @@ class MainActivity : AppCompatActivity() {
         )
     }
 
+    private fun activateStream() {
+        videoStreamManager.startStreaming()
+        wsManager.sendText("""{"type":"stream_start"}""")
+        binding.btnVideo.text = "■ VIDEO"
+        binding.btnVideo.setTextColor(Color.parseColor("#AA44FF"))
+    }
+
+    private fun deactivateStream() {
+        videoStreamManager.stopStreaming()
+        wsManager.sendText("""{"type":"stream_stop"}""")
+        binding.btnVideo.text = "VIDEO"
+        binding.btnVideo.setTextColor(Color.parseColor("#666666"))
+    }
+
     private fun showTransformedPhoto(bytes: ByteArray) {
         val bitmap = BitmapFactory.decodeByteArray(bytes, 0, bytes.size) ?: return
         binding.ivPhoto.setImageBitmap(bitmap)
@@ -220,6 +269,7 @@ class MainActivity : AppCompatActivity() {
 
     override fun onDestroy() {
         super.onDestroy()
+        if (videoStreamManager.isStreaming()) videoStreamManager.stopStreaming()
         speechManager.stop()
         wsManager.disconnect()
     }

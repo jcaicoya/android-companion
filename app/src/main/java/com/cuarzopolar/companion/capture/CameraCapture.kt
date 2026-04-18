@@ -3,9 +3,11 @@ package com.cuarzopolar.companion.capture
 import android.content.Context
 import android.util.Log
 import androidx.camera.core.CameraSelector
+import androidx.camera.core.ImageAnalysis
 import androidx.camera.core.ImageCapture
 import androidx.camera.core.ImageCaptureException
 import androidx.camera.core.ImageProxy
+import androidx.camera.core.UseCase
 import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.LifecycleOwner
@@ -19,7 +21,7 @@ class CameraCapture(
     private var imageCapture: ImageCapture? = null
     private var bound = false
 
-    fun bindCamera(onReady: () -> Unit) {
+    fun bindCamera(analysis: ImageAnalysis? = null, onReady: () -> Unit) {
         val future = ProcessCameraProvider.getInstance(context)
         future.addListener({
             val provider = future.get()
@@ -29,10 +31,14 @@ class CameraCapture(
             imageCapture = capture
             try {
                 provider.unbindAll()
+                val useCases = buildList<UseCase> {
+                    add(capture)
+                    if (analysis != null) add(analysis)
+                }
                 provider.bindToLifecycle(
                     lifecycleOwner,
                     CameraSelector.DEFAULT_FRONT_CAMERA,
-                    capture
+                    *useCases.toTypedArray()
                 )
                 bound = true
                 Log.d("CameraCapture", "Camera bound (front)")
