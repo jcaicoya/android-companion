@@ -44,7 +44,8 @@ class MainActivity : AppCompatActivity() {
     private val requestCameraPermission = registerForActivityResult(
         ActivityResultContracts.RequestPermission()
     ) { granted ->
-        if (granted) takePhoto() else toast("Permiso de cámara denegado")
+        if (granted) cameraCapture.bindCamera { takePhoto() }
+        else toast("Permiso de cámara denegado")
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -63,7 +64,10 @@ class MainActivity : AppCompatActivity() {
         }
 
         cameraCapture = CameraCapture(this, this)
-        cameraCapture.bindCamera {}
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA)
+                == PackageManager.PERMISSION_GRANTED) {
+            cameraCapture.bindCamera {}
+        }
 
         // Handle incoming binary frames (transformed photo from Qt)
         wsManager.onBinaryMessage = { bytes ->
