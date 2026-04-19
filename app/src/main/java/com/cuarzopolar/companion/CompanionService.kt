@@ -55,6 +55,7 @@ class CompanionService : LifecycleService() {
     private var photoCallback: ((ByteArray) -> Unit)? = null
     private var discoveryJob: Job? = null
     private var microphoneActive = false
+    private var shuttingDownFromTaskRemoval = false
 
     fun setPhotoCallback(cb: (ByteArray) -> Unit) { photoCallback = cb }
     fun clearPhotoCallback() { photoCallback = null }
@@ -154,7 +155,7 @@ class CompanionService : LifecycleService() {
                     resetLiveEffectsOnDisconnect()
                 }
                 updateNotification(text)
-                if (state == ConnectionState.DISCONNECTED) startDiscovery()
+                if (state == ConnectionState.DISCONNECTED && !shuttingDownFromTaskRemoval) startDiscovery()
                 if (state == ConnectionState.CONNECTED)    stopDiscovery()
             }
         }
@@ -175,6 +176,21 @@ class CompanionService : LifecycleService() {
         stopDiscovery()
         wsManager.disconnect()
         speechManager.stop()
+    }
+
+    override fun onTaskRemoved(rootIntent: Intent?) {
+        shutdownFromUserExit()
+        super.onTaskRemoved(rootIntent)
+    }
+
+    fun shutdownFromUserExit() {
+        shuttingDownFromTaskRemoval = true
+        getSharedPreferences("companion_prefs", Context.MODE_PRIVATE)
+            .edit().remove("last_ip").apply()
+        stopDiscovery()
+        resetLiveEffectsOnDisconnect()
+        wsManager.disconnect()
+        stopSelf()
     }
 
     fun connect(ip: String) {

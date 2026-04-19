@@ -1,70 +1,164 @@
-# Networking Architecture & Alternatives
+# Networking - Android Companion
 
-This document captures the exploration of different wireless networking strategies for connecting the `ataque-inicial` Qt desktop application (laptop) with the `android-companion` mobile application (actor's phone) during a live theatrical performance.
+This document tracks the current network behavior between the Android companion app and the Qt `ataque-inicial` laptop app.
 
-## Current Architecture: Wi-Fi + WebSockets
+Everything here is for theatrical show control. No real device compromise is performed.
 
-The currently implemented architecture relies on a local Wi-Fi network.
-*   **Protocol:** WebSockets (Port 8765)
-*   **Transport:** JSON for commands/transcripts, Binary frames for JPEG photos.
-*   **Setup:** Both devices connect to the same local area network (LAN). The phone connects to the laptop's IP address.
+## Current Architecture
 
-### Challenge
-Manually typing the laptop's IP address into the phone before every show is prone to error and friction.
+- Qt laptop app: WebSocket server on port `8765`.
+- Android companion: WebSocket client.
+- Discovery: Qt broadcasts UDP beacons; Android listens and auto-connects.
+- Manual fallback: Android bottom sheet accepts a laptop IP.
+- Text protocol: compact JSON over WebSocket text frames.
+- Binary protocol: JPEG data over WebSocket binary frames.
+- Heartbeat: Qt sends `ping`; Android replies `pong`.
 
----
+## Recommended Show Network
 
-## Explored Alternatives for Device Connectivity
+Use the laptop as the stage network:
 
-We explored several wireless methods to connect the Windows laptop directly to the Android phone.
+1. Enable Windows Mobile Hotspot on the laptop.
+2. Connect the Android show device to that hotspot.
+3. Launch Qt.
+4. Launch Android companion.
+5. Wait for `ENLACE ACTIVO` / green dot on both sides.
 
-### 1. The "Hotspot" Method (Software Access Point) - *Highly Recommended*
+This avoids venue Wi-Fi variability and usually gives the laptop a predictable address.
 
-Instead of bringing a physical Wi-Fi router to the theater, one device acts as the router.
-*   **How it works:** The Windows laptop turns on its built-in "Mobile Hotspot" (e.g., "CuarzoPolar-Stage"). The Android phone connects to this Wi-Fi network.
-*   **Pros:**
-    *   **Zero Code Changes:** The existing WebSocket code works perfectly without modifications.
-    *   **No Extra Hardware:** Eliminates the need for a physical stage router.
-    *   **High Bandwidth & Range:** Uses standard Wi-Fi, easily handling instant JPEG photo transfers and low-latency cues.
-    *   **Predictable IP:** The laptop hosting the hotspot usually assigns itself a fixed IP (like `192.168.137.1` on Windows). The Android app can hardcode or default to this IP, eliminating manual entry.
-*   **Cons:** Relies on the laptop's Wi-Fi chip being able to broadcast effectively to the stage.
+## Connection Lifecycle
 
-### 2. Wi-Fi with UDP Auto-Discovery (The "MAC Filter" Alternative)
+### Startup
 
-If using a standard router or hotspot, we can automate the connection process to avoid typing IPs.
-*   **How it works:**
-    *   **Discovery:** The Qt app broadcasts a small UDP packet (e.g., on port 8766) every 2 seconds containing its IP and WebSocket port. The Android app listens on this port and automatically connects when it hears the beacon.
-    *   **Authentication (Replacing MAC Filtering):** Android restricts reading the real hardware MAC address for privacy. Instead, the Android app generates a persistent `UUID` on first install. It sends this ID upon connection. The Qt app maintains a whitelist of allowed `deviceId`s and drops unknown connections.
-*   **Pros:** Seamless setup; zero configuration needed by the operator.
-*   **Cons:** Requires writing UDP broadcast/listener code on both C++ and Kotlin sides.
+1. Android starts `CompanionService` as a foreground service.
+2. If a saved IP exists, Android tries it.
+3. If not connected, Android waits for Qt UDP discovery.
+4. On connection, Android sends:
 
-### 3. Bluetooth Classic (RFCOMM/SPP) - *Discarded*
+```json
+{"type":"status","deviceName":"<android model>"}
+```
 
-Connecting the devices via standard Bluetooth pairing.
-*   **Pros:** No IP addresses to manage; completely independent of Wi-Fi infrastructure.
-*   **Cons (Fatal for Live Shows):**
-    *   **Audience Interference:** The 2.4GHz Bluetooth spectrum becomes extremely noisy with 100+ smartphones in the audience, risking high latency or dropped connections exactly when a stage cue (like a vibration) is needed.
-    *   **Bandwidth Limits:** Maxes out at 2-3 Mbps. Transferring compressed JPEG photos takes noticeably longer than Wi-Fi. It cannot support future Phase 5 video streaming.
-    *   **Pairing Friction:** Requires manual OS-level pairing before the app can be used.
-    *   **Architecture rewrite:** Would require discarding WebSockets and implementing `QBluetoothServer` (Qt) and Bluetooth sockets (Android).
+### Healthy Connection
 
-### 4. Wi-Fi Direct (Wi-Fi P2P) - *Discarded*
+Qt sends:
 
-Allows devices to connect directly via Wi-Fi without a router/hotspot.
-*   **Pros:** High speed and good range.
-*   **Cons:** The APIs are notoriously difficult to bridge seamlessly between Windows C++ and Android Kotlin. The complex connection-negotiation code required makes this unviable compared to the simplicity of the Hotspot method, which achieves the exact same physical result.
+```json
+{"type":"ping"}
+```
 
-### 5. Esoteric Methods - *Discarded*
+Android replies:
 
-*   **Audio Data Transmission (Ultrasound):** Sending data via high-frequency audio picked up by the mic. *Reason for discard:* Bandwidth is only a few bytes per second; impossible for photos.
-*   **NFC (Near Field Communication):** *Reason for discard:* Range is only a few centimeters; impossible for remote stage control.
+```json
+{"type":"pong"}
+```
 
----
+Qt treats missed heartbeats as a disconnect and updates the UI to `SIN ENLACE`.
 
-## Conclusion & Recommendation
+### Connection Loss
 
-For a live theatrical performance where timing, reliability, and bandwidth (for photos) are critical:
+When Android detects `DISCONNECTED`, it returns to normal mode:
 
-1.  **Transport:** Stick with the **Wi-Fi + WebSockets** architecture. It is the industry standard for high-bandwidth, low-latency local control.
-2.  **Infrastructure:** Use the **Windows Mobile Hotspot** method to avoid bringing a physical router while maintaining a predictable IP address.
-3.  **Future Enhancement:** Implement **UDP Auto-Discovery** combined with a UUID whitelist if manual IP entry remains a friction point.
+- stop speech recognition
+- clear microphone foreground-service state
+- stop video streaming
+- hide red screen
+- keep discovery/reconnect running unless the app is being closed
+
+### Android App Closed
+
+If the user closes/swipes away the Android app, the service now performs an operator shutdown:
+
+- clear saved IP
+- stop discovery
+- stop mic/camera/red screen
+- close the WebSocket
+- stop the service
+
+This is important because Qt should not remain on `ENLACE ACTIVO` after the Android app is closed.
+
+## Message Protocol
+
+### Qt To Android
+
+| Action | Message |
+|---|---|
+| Vibrate | `{"type":"command","action":"vibrate","targetId":"..."}` |
+| Sound | `{"type":"command","action":"playSound","targetId":"..."}` |
+| Show red screen / block | `{"type":"command","action":"showRedScreen","targetId":"..."}` |
+| Hide red screen / unblock | `{"type":"command","action":"hideRedScreen","targetId":"..."}` |
+| Start microphone | `{"type":"command","action":"startMic","targetId":"..."}` |
+| Stop microphone | `{"type":"command","action":"stopMic","targetId":"..."}` |
+| Take photo | `{"type":"command","action":"takePhoto","targetId":"..."}` |
+| Start video stream | `{"type":"command","action":"startStream"}` |
+| Stop video stream | `{"type":"command","action":"stopStream"}` |
+| Heartbeat | `{"type":"ping"}` |
+
+### Android To Qt
+
+| Purpose | Message |
+|---|---|
+| Heartbeat reply | `{"type":"pong"}` |
+| Connection status | `{"type":"status","deviceName":"..."}` |
+| Speech transcript | `{"type":"transcript","text":"..."}` |
+| Photo marker | `{"type":"photo_ready"}` followed by binary JPEG |
+| Stream started | `{"type":"stream_start"}` |
+| Stream stopped | `{"type":"stream_stop"}` |
+| Video frame | binary JPEG while streaming |
+
+### Qt To Android Binary
+
+After Android sends a still photo, Qt transforms it into a thermal-style image and returns the transformed JPEG as a binary WebSocket frame.
+
+## Ports
+
+| Purpose | Port |
+|---|---|
+| WebSocket control/data | `8765` |
+| UDP auto-discovery beacon | see `UdpBeacon` / `UdpDiscovery` implementation |
+
+## Operational Rules
+
+- Android should only activate mic/camera/red screen while connected to Qt.
+- On any disconnect, Android returns to normal mode.
+- Qt action buttons should be disabled when no Android client is connected.
+- Qt STREAM uses optimistic pending UI:
+  - button flips immediately
+  - Android confirmation keeps it active
+  - timeout reverts it
+
+## Troubleshooting
+
+### Qt says `SIN ENLACE`
+
+- Confirm Android and laptop are on the same Wi-Fi/hotspot.
+- Confirm Qt is running before Android tries auto-discovery.
+- Try manual IP entry from Android's disconnected status sheet.
+- Check Windows firewall for port `8765`.
+
+### Qt stays `ENLACE ACTIVO` after closing Android
+
+This should now be fixed for normal app close/swipe-away paths. If it happens again:
+
+- confirm the updated APK is installed
+- check whether Android is keeping the process alive due to OEM battery/service policy
+- close the task from Recents and wait for heartbeat timeout
+
+### Mic Does Not Send Transcripts
+
+- Confirm Android has `RECORD_AUDIO` permission.
+- Confirm foreground-service microphone permission exists on Android 14+.
+- Confirm the app is connected before pressing `MIC`.
+
+### Stream Button Times Out
+
+- Confirm Android has `CAMERA` permission.
+- Confirm camera is not already locked by another app.
+- Confirm the device is not in a privacy mode blocking camera use.
+
+## Next Steps
+
+- Verify UDP discovery port and document it explicitly in both code and docs.
+- Add an operator pre-show network checklist.
+- Test on the exact show tablet and laptop using Windows Mobile Hotspot.
+- Decide whether kiosk/device-owner mode will be used for the final show device.
