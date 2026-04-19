@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:background="#111111"
+    android:padding="24dp">
+
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="CONECTAR"
+        android:textSize="12sp"
+        android:textColor="#888888"
+        android:fontFamily="monospace"
+        android:letterSpacing="0.15"
+        android:layout_marginBottom="16dp" />
+
+    <EditText
+        android:id="@+id/etIp"
+        android:layout_width="match_parent"
+        android:layout_height="50dp"
+        android:hint="@string/hint_ip"
+        android:inputType="textUri"
+        android:fontFamily="monospace"
+        android:textColor="#00FF00"
+        android:textColorHint="#444444"
+        android:background="#1a1a1a"
+        android:paddingStart="14dp"
+        android:paddingEnd="14dp"
+        android:textSize="15sp" />
+
+    <Button
+        android:id="@+id/btnConnect"
+        style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+        android:layout_width="match_parent"
+        android:layout_height="50dp"
+        android:text="@string/btn_connect"
+        android:textAllCaps="true"
+        android:textColor="#00FF00"
+        android:textSize="14sp"
+        android:fontFamily="monospace"
+        app:strokeColor="#00FF00"
+        app:strokeWidth="1dp"
+        app:backgroundTint="#111111"
+        android:layout_marginTop="8dp"
+        android:layout_marginBottom="16dp" />
+
+</LinearLayout>

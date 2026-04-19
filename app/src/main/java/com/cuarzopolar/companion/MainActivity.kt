@@ -1,258 +1,136 @@
 package com.cuarzopolar.companion
 
 import android.Manifest
+import android.app.admin.DevicePolicyManager
+import android.content.ComponentName
 import android.content.Context
-import android.content.pm.PackageManager
+import android.content.Intent
+import android.content.ServiceConnection
 import android.graphics.BitmapFactory
 import android.graphics.Color
+import android.os.Build
 import android.os.Bundle
+import android.os.IBinder
+import android.view.LayoutInflater
 import android.view.View
-import android.widget.Toast
+import android.widget.EditText
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.lifecycleScope
-import com.cuarzopolar.companion.capture.CameraCapture
-import com.cuarzopolar.companion.capture.SpeechManager
-import com.cuarzopolar.companion.capture.VideoStreamManager
-import com.cuarzopolar.companion.commands.CommandHandler
 import com.cuarzopolar.companion.databinding.ActivityMainBinding
 import com.cuarzopolar.companion.network.ConnectionState
-import com.cuarzopolar.companion.network.MessageDispatcher
-import com.cuarzopolar.companion.network.WebSocketManager
-import com.cuarzopolar.companion.network.UdpDiscovery
-import kotlinx.coroutines.Job
+import com.google.android.material.bottomsheet.BottomSheetDialog
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 
 class MainActivity : AppCompatActivity() {
 
     private lateinit var binding: ActivityMainBinding
-    private val wsManager = WebSocketManager()
-    private lateinit var commandHandler: CommandHandler
-    private lateinit var dispatcher: MessageDispatcher
-    private lateinit var speechManager: SpeechManager
-    private lateinit var cameraCapture: CameraCapture
-    private lateinit var videoStreamManager: VideoStreamManager
+    private var service: CompanionService? = null
+    private var serviceBound = false
 
-    private var micActive = false
-    private var awaitingPhoto = false
-    private var discoveryJob: Job? = null
-
-    // Permission launchers
-    private val requestMicPermission = registerForActivityResult(
-        ActivityResultContracts.RequestPermission()
-    ) { granted ->
-        if (granted) toggleMic() else toast("Permiso de micrófono denegado")
+    private val serviceConnection = object : ServiceConnection {
+        override fun onServiceConnected(name: ComponentName?, binder: IBinder?) {
+            service = (binder as CompanionService.LocalBinder).getService()
+            serviceBound = true
+            observeConnectionState()
+            service?.setPhotoCallback { bytes ->
+                runOnUiThread { showTransformedPhoto(bytes) }
+            }
+        }
+        override fun onServiceDisconnected(name: ComponentName?) {
+            serviceBound = false
+            service = null
+        }
     }
 
-    private val requestCameraPermission = registerForActivityResult(
-        ActivityResultContracts.RequestPermission()
-    ) { granted ->
-        if (granted) cameraCapture.bindCamera(videoStreamManager.imageAnalysis) { takePhoto() }
-        else toast("Permiso de cámara denegado")
+    private val requestPermissions = registerForActivityResult(
+        ActivityResultContracts.RequestMultiplePermissions()
+    ) { results ->
+        if (results[Manifest.permission.CAMERA] == true) {
+            service?.bindCameraIfNeeded()
+        }
     }
+
+    private val deviceAdminLauncher = registerForActivityResult(
+        ActivityResultContracts.StartActivityForResult()
+    ) { /* result handled silently — user may have declined */ }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         binding = ActivityMainBinding.inflate(layoutInflater)
         setContentView(binding.root)
 
-        commandHandler = CommandHandler(applicationContext)
-        dispatcher     = MessageDispatcher(commandHandler)
-
-        speechManager = SpeechManager(this) { transcript ->
-            // Send to Qt over WebSocket
-            wsManager.sendText("""{"type":"transcript","text":"${transcript.replace("\"", "\\\"")}"}""")
-            // Also show locally
-            runOnUiThread { binding.tvTranscript.text = transcript }
+        // Start service (keeps running even when activity is gone) and bind
+        val svcIntent = Intent(this, CompanionService::class.java)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            startForegroundService(svcIntent)
+        } else {
+            startService(svcIntent)
         }
+        bindService(svcIntent, serviceConnection, Context.BIND_AUTO_CREATE)
 
-        videoStreamManager = VideoStreamManager { jpegBytes ->
-            if (wsManager.connectionState.value == ConnectionState.CONNECTED) {
-                wsManager.sendBinary(jpegBytes)
-            }
-        }
-        cameraCapture = CameraCapture(this, this)
-        if (ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA)
-                == PackageManager.PERMISSION_GRANTED) {
-            cameraCapture.bindCamera(videoStreamManager.imageAnalysis) {}
-        }
+        // Tap dot or status label → open connect sheet when disconnected
+        binding.tvDot.setOnClickListener    { onStatusTapped() }
+        binding.tvStatus.setOnClickListener { onStatusTapped() }
 
-        // Handle incoming binary frames (transformed photo from Qt)
-        wsManager.onBinaryMessage = { bytes ->
-            runOnUiThread {
-                if (awaitingPhoto) {
-                    awaitingPhoto = false
-                    showTransformedPhoto(bytes)
-                }
-            }
-        }
+        // Tap photo overlay to dismiss
+        binding.ivPhoto.setOnClickListener { binding.ivPhoto.visibility = View.GONE }
 
-        // Restore saved IP
-        val prefs = getSharedPreferences("companion_prefs", Context.MODE_PRIVATE)
-        binding.etIp.setText(prefs.getString("last_ip", ""))
+        requestInitialPermissions()
+        promptDeviceAdminIfNeeded()
+    }
 
-        // Route incoming text messages, intercepting stream commands
-        wsManager.onTextMessage = { msg ->
-            try {
-                val obj = org.json.JSONObject(msg)
-                if (obj.optString("type") == "command") {
-                    when (obj.optString("action")) {
-                        "startStream" -> runOnUiThread { activateStream() }
-                        "stopStream"  -> runOnUiThread { deactivateStream() }
-                        else          -> dispatcher.dispatch(msg)
-                    }
-                } else {
-                    dispatcher.dispatch(msg)
-                }
-            } catch (_: Exception) {
-                dispatcher.dispatch(msg)
-            }
-        }
-
-        // Connection button
-        binding.btnConnect.setOnClickListener {
-            val ip = binding.etIp.text.toString().trim()
-            if (wsManager.connectionState.value == ConnectionState.CONNECTED) {
-                wsManager.disconnect()
-            } else if (ip.isNotEmpty()) {
-                prefs.edit().putString("last_ip", ip).apply()
-                wsManager.connect(ip)
-            }
-        }
-
-        // Rehearsal test buttons
-        binding.btnTestVibrate.setOnClickListener   { commandHandler.testVibrate()   }
-        binding.btnTestSound.setOnClickListener     { commandHandler.testSound()     }
-        binding.btnTestRedScreen.setOnClickListener { commandHandler.testRedScreen() }
-
-        // Microphone toggle
-        binding.btnMic.setOnClickListener {
-            if (ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO)
-                == PackageManager.PERMISSION_GRANTED) {
-                toggleMic()
-            } else {
-                requestMicPermission.launch(Manifest.permission.RECORD_AUDIO)
-            }
-        }
-
-        // Camera / photo
-        binding.btnPhoto.setOnClickListener {
-            if (ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA)
-                == PackageManager.PERMISSION_GRANTED) {
-                takePhoto()
-            } else {
-                requestCameraPermission.launch(Manifest.permission.CAMERA)
-            }
-        }
-
-        // Video stream toggle
-        binding.btnVideo.setOnClickListener {
-            if (videoStreamManager.isStreaming()) deactivateStream() else activateStream()
-        }
-
-        // Dismiss transformed photo on tap
-        binding.ivPhoto.setOnClickListener {
-            binding.ivPhoto.visibility = View.GONE
-        }
-
-        // Observe connection state
+    private fun observeConnectionState() {
+        val svc = service ?: return
         lifecycleScope.launch {
-            wsManager.connectionState.collectLatest { state ->
+            svc.connectionState.collectLatest { state ->
                 when (state) {
                     ConnectionState.CONNECTED -> {
                         binding.tvDot.setTextColor(Color.parseColor("#00FF00"))
                         binding.tvStatus.text = getString(R.string.connected)
-                        binding.btnConnect.text = getString(R.string.btn_disconnect)
-                        binding.btnMic.isEnabled = true
-                        binding.btnPhoto.isEnabled = true
-                        binding.btnVideo.isEnabled = true
-                        discoveryJob?.cancel()  // stop looking once connected
+                        binding.tvStatus.setTextColor(Color.parseColor("#00FF00"))
                     }
                     ConnectionState.CONNECTING -> {
                         binding.tvDot.setTextColor(Color.parseColor("#FFAA00"))
                         binding.tvStatus.text = getString(R.string.connecting)
-                        binding.btnConnect.text = getString(R.string.btn_connect)
+                        binding.tvStatus.setTextColor(Color.parseColor("#FFAA00"))
                     }
                     ConnectionState.DISCONNECTED -> {
                         binding.tvDot.setTextColor(Color.parseColor("#FF4444"))
                         binding.tvStatus.text = getString(R.string.disconnected)
-                        binding.btnConnect.text = getString(R.string.btn_connect)
-                        binding.btnMic.isEnabled = false
-                        binding.btnPhoto.isEnabled = false
-                        binding.btnVideo.isEnabled = false
-                        if (videoStreamManager.isStreaming()) deactivateStream()
-                        if (micActive) { micActive = false; speechManager.stop() }
-                        startDiscovery()  // resume looking after a drop
+                        binding.tvStatus.setTextColor(Color.parseColor("#666666"))
                     }
                 }
             }
         }
     }
 
-    private fun startDiscovery() {
-        discoveryJob?.cancel()
-        discoveryJob = lifecycleScope.launch {
-            try {
-                val beacon = UdpDiscovery.awaitBeacon()
-                // Only auto-connect if not already connected
-                if (wsManager.connectionState.value == ConnectionState.DISCONNECTED) {
-                    binding.etIp.setText(beacon.ip)
-                    getSharedPreferences("companion_prefs", MODE_PRIVATE)
-                        .edit().putString("last_ip", beacon.ip).apply()
-                    wsManager.connect(beacon.ip)
-                }
-            } catch (_: Exception) {
-                // Cancelled or socket error — silently ignore
+    private fun onStatusTapped() {
+        val svc = service ?: return
+        if (svc.connectionState.value != ConnectionState.DISCONNECTED) return
+        showConnectBottomSheet()
+    }
+
+    private fun showConnectBottomSheet() {
+        val sheet = BottomSheetDialog(this)
+        val sheetView = LayoutInflater.from(this).inflate(R.layout.bottom_sheet_connect, null)
+        sheet.setContentView(sheetView)
+
+        val etIp = sheetView.findViewById<EditText>(R.id.etIp)
+        val prefs = getSharedPreferences("companion_prefs", Context.MODE_PRIVATE)
+        etIp.setText(prefs.getString("last_ip", ""))
+
+        sheetView.findViewById<View>(R.id.btnConnect).setOnClickListener {
+            val ip = etIp.text.toString().trim()
+            if (ip.isNotEmpty()) {
+                service?.connect(ip)
+                sheet.dismiss()
             }
         }
-    }
 
-    private fun toggleMic() {
-        micActive = !micActive
-        if (micActive) {
-            speechManager.start()
-            binding.btnMic.text = "■ MICRÓFONO"
-            binding.btnMic.setTextColor(Color.parseColor("#00FF00"))
-        } else {
-            speechManager.stop()
-            binding.tvTranscript.text = ""
-            binding.btnMic.text = "MICRÓFONO"
-            binding.btnMic.setTextColor(Color.parseColor("#666666"))
-        }
-    }
-
-    private fun takePhoto() {
-        binding.btnPhoto.isEnabled = false
-        cameraCapture.takePicture(
-            onResult = { bytes ->
-                // Signal Qt that photo is coming, then send binary
-                wsManager.sendText("""{"type":"photo_ready"}""")
-                wsManager.sendBinary(bytes)
-                awaitingPhoto = true
-                binding.btnPhoto.isEnabled = true
-                toast("Foto enviada…")
-            },
-            onError = { msg ->
-                binding.btnPhoto.isEnabled = true
-                toast("Error: $msg")
-            }
-        )
-    }
-
-    private fun activateStream() {
-        videoStreamManager.startStreaming()
-        wsManager.sendText("""{"type":"stream_start"}""")
-        binding.btnVideo.text = "■ VIDEO"
-        binding.btnVideo.setTextColor(Color.parseColor("#AA44FF"))
-    }
-
-    private fun deactivateStream() {
-        videoStreamManager.stopStreaming()
-        wsManager.sendText("""{"type":"stream_stop"}""")
-        binding.btnVideo.text = "VIDEO"
-        binding.btnVideo.setTextColor(Color.parseColor("#666666"))
+        sheet.show()
     }
 
     private fun showTransformedPhoto(bytes: ByteArray) {
@@ -261,13 +139,42 @@ class MainActivity : AppCompatActivity() {
         binding.ivPhoto.visibility = View.VISIBLE
     }
 
-    private fun toast(msg: String) =
-        Toast.makeText(this, msg, Toast.LENGTH_SHORT).show()
+    private fun requestInitialPermissions() {
+        val needed = mutableListOf<String>()
+        fun needs(p: String) =
+            ContextCompat.checkSelfPermission(this, p) != android.content.pm.PackageManager.PERMISSION_GRANTED
+        if (needs(Manifest.permission.CAMERA))       needed.add(Manifest.permission.CAMERA)
+        if (needs(Manifest.permission.RECORD_AUDIO)) needed.add(Manifest.permission.RECORD_AUDIO)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
+            needs(Manifest.permission.POST_NOTIFICATIONS)) {
+            needed.add(Manifest.permission.POST_NOTIFICATIONS)
+        }
+        if (needed.isNotEmpty()) requestPermissions.launch(needed.toTypedArray())
+    }
+
+    private fun promptDeviceAdminIfNeeded() {
+        val dpm = getSystemService(Context.DEVICE_POLICY_SERVICE) as DevicePolicyManager
+        val comp = ComponentName(this, CompanionDeviceAdminReceiver::class.java)
+        if (!dpm.isAdminActive(comp)) {
+            val prefs = getSharedPreferences("companion_prefs", Context.MODE_PRIVATE)
+            if (!prefs.getBoolean("admin_prompted", false)) {
+                prefs.edit().putBoolean("admin_prompted", true).apply()
+                val intent = Intent(DevicePolicyManager.ACTION_ADD_DEVICE_ADMIN).apply {
+                    putExtra(DevicePolicyManager.EXTRA_DEVICE_ADMIN, comp)
+                    putExtra(DevicePolicyManager.EXTRA_ADD_EXPLANATION,
+                        "Permite bloquear el teléfono durante la escena de ataque.")
+                }
+                deviceAdminLauncher.launch(intent)
+            }
+        }
+    }
 
     override fun onDestroy() {
         super.onDestroy()
-        if (videoStreamManager.isStreaming()) videoStreamManager.stopStreaming()
-        speechManager.stop()
-        wsManager.disconnect()
+        if (serviceBound) {
+            service?.clearPhotoCallback()
+            unbindService(serviceConnection)
+            serviceBound = false
+        }
     }
 }

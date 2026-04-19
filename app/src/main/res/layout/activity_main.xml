@@ -4,148 +4,39 @@
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="#000000"
-    android:padding="24dp">
+    android:background="#000000">
 
-    <!-- ── CONNECTION STATUS ──────────────────────────────────── -->
+    <!-- Connection dot — large, centered, tappable -->
     <TextView
         android:id="@+id/tvDot"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:text="●"
-        android:textSize="28sp"
+        android:textSize="80sp"
         android:textColor="#FF4444"
         android:fontFamily="monospace"
+        android:clickable="true"
+        android:focusable="true"
         app:layout_constraintTop_toTopOf="parent"
+        app:layout_constraintBottom_toTopOf="@id/tvStatus"
         app:layout_constraintStart_toStartOf="parent"
-        android:layout_marginTop="32dp" />
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintVertical_chainStyle="packed"
+        android:layout_marginBottom="20dp" />
 
     <TextView
         android:id="@+id/tvStatus"
-        android:layout_width="0dp"
+        android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:text="@string/disconnected"
-        android:textSize="14sp"
+        android:textSize="16sp"
         android:textColor="#666666"
         android:fontFamily="monospace"
-        app:layout_constraintTop_toTopOf="@id/tvDot"
-        app:layout_constraintBottom_toBottomOf="@id/tvDot"
-        app:layout_constraintStart_toEndOf="@id/tvDot"
-        app:layout_constraintEnd_toEndOf="parent"
-        android:layout_marginStart="10dp" />
-
-    <!-- ── IP + CONNECT ──────────────────────────────────────── -->
-    <EditText
-        android:id="@+id/etIp"
-        android:layout_width="0dp"
-        android:layout_height="50dp"
-        android:hint="@string/hint_ip"
-        android:inputType="textUri"
-        android:fontFamily="monospace"
-        android:textColor="#00FF00"
-        android:textColorHint="#444444"
-        android:background="#111111"
-        android:paddingStart="14dp"
-        android:paddingEnd="14dp"
-        android:textSize="15sp"
+        android:letterSpacing="0.1"
         app:layout_constraintTop_toBottomOf="@id/tvDot"
+        app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintEnd_toEndOf="parent"
-        android:layout_marginTop="20dp" />
-
-    <Button
-        android:id="@+id/btnConnect"
-        style="@style/Widget.MaterialComponents.Button.OutlinedButton"
-        android:layout_width="0dp"
-        android:layout_height="50dp"
-        android:text="@string/btn_connect"
-        android:textAllCaps="true"
-        android:textColor="#00FF00"
-        android:textSize="14sp"
-        android:fontFamily="monospace"
-        app:strokeColor="#00FF00"
-        app:strokeWidth="1dp"
-        app:backgroundTint="#111111"
-        app:layout_constraintTop_toBottomOf="@id/etIp"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintEnd_toEndOf="parent"
-        android:layout_marginTop="8dp" />
-
-    <!-- ── SPEECH / TRANSCRIPT ───────────────────────────────── -->
-    <Button
-        android:id="@+id/btnMic"
-        style="@style/Widget.MaterialComponents.Button.OutlinedButton"
-        android:layout_width="0dp"
-        android:layout_height="50dp"
-        android:text="MICRÓFONO"
-        android:textAllCaps="true"
-        android:textColor="#666666"
-        android:textSize="13sp"
-        android:fontFamily="monospace"
-        android:enabled="false"
-        app:strokeColor="#333333"
-        app:strokeWidth="1dp"
-        app:backgroundTint="#111111"
-        app:layout_constraintTop_toBottomOf="@id/btnConnect"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintEnd_toEndOf="parent"
-        android:layout_marginTop="20dp" />
-
-    <TextView
-        android:id="@+id/tvTranscript"
-        android:layout_width="0dp"
-        android:layout_height="wrap_content"
-        android:text=""
-        android:textSize="13sp"
-        android:textColor="#00AA00"
-        android:fontFamily="monospace"
-        android:minHeight="36dp"
-        android:gravity="center_vertical"
-        android:paddingStart="4dp"
-        app:layout_constraintTop_toBottomOf="@id/btnMic"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintEnd_toEndOf="parent"
-        android:layout_marginTop="6dp" />
-
-    <!-- ── CAMERA / PHOTO ────────────────────────────────────── -->
-    <Button
-        android:id="@+id/btnPhoto"
-        style="@style/Widget.MaterialComponents.Button.OutlinedButton"
-        android:layout_width="0dp"
-        android:layout_height="50dp"
-        android:text="TOMAR FOTO"
-        android:textAllCaps="true"
-        android:textColor="#FFAA00"
-        android:textSize="13sp"
-        android:fontFamily="monospace"
-        android:enabled="false"
-        app:strokeColor="#FFAA00"
-        app:strokeWidth="1dp"
-        app:backgroundTint="#111111"
-        app:layout_constraintTop_toBottomOf="@id/tvTranscript"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintEnd_toEndOf="parent"
-        android:layout_marginTop="8dp" />
-
-    <!-- ── VIDEO STREAM ──────────────────────────────────────── -->
-    <Button
-        android:id="@+id/btnVideo"
-        style="@style/Widget.MaterialComponents.Button.OutlinedButton"
-        android:layout_width="0dp"
-        android:layout_height="50dp"
-        android:text="VIDEO"
-        android:textAllCaps="true"
-        android:textColor="#666666"
-        android:textSize="13sp"
-        android:fontFamily="monospace"
-        android:enabled="false"
-        app:strokeColor="#666666"
-        app:strokeWidth="1dp"
-        app:backgroundTint="#111111"
-        app:layout_constraintTop_toBottomOf="@id/btnPhoto"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintEnd_toEndOf="parent"
-        android:layout_marginTop="8dp" />
+        app:layout_constraintEnd_toEndOf="parent" />
 
     <!-- Transformed photo overlay (tap to dismiss) -->
     <ImageView
@@ -161,70 +52,5 @@
         app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintEnd_toEndOf="parent" />
-
-    <!-- ── REHEARSAL TEST BUTTONS ────────────────────────────── -->
-    <TextView
-        android:id="@+id/tvTestLabel"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:text="ENSAYO"
-        android:textSize="10sp"
-        android:textColor="#333333"
-        android:fontFamily="monospace"
-        android:letterSpacing="0.15"
-        app:layout_constraintBottom_toTopOf="@id/btnTestVibrate"
-        app:layout_constraintStart_toStartOf="parent"
-        android:layout_marginBottom="6dp" />
-
-    <Button
-        android:id="@+id/btnTestVibrate"
-        style="@style/Widget.MaterialComponents.Button.OutlinedButton"
-        android:layout_width="0dp"
-        android:layout_height="46dp"
-        android:text="VIBRAR"
-        android:textColor="#FFAA00"
-        android:textSize="12sp"
-        android:fontFamily="monospace"
-        app:strokeColor="#FFAA00"
-        app:strokeWidth="1dp"
-        app:backgroundTint="#111111"
-        app:layout_constraintBottom_toTopOf="@id/btnTestSound"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintEnd_toEndOf="parent"
-        android:layout_marginBottom="6dp" />
-
-    <Button
-        android:id="@+id/btnTestSound"
-        style="@style/Widget.MaterialComponents.Button.OutlinedButton"
-        android:layout_width="0dp"
-        android:layout_height="46dp"
-        android:text="SONIDO"
-        android:textColor="#00AAFF"
-        android:textSize="12sp"
-        android:fontFamily="monospace"
-        app:strokeColor="#00AAFF"
-        app:strokeWidth="1dp"
-        app:backgroundTint="#111111"
-        app:layout_constraintBottom_toTopOf="@id/btnTestRedScreen"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintEnd_toEndOf="parent"
-        android:layout_marginBottom="6dp" />
-
-    <Button
-        android:id="@+id/btnTestRedScreen"
-        style="@style/Widget.MaterialComponents.Button.OutlinedButton"
-        android:layout_width="0dp"
-        android:layout_height="46dp"
-        android:text="PANTALLA ROJA"
-        android:textColor="#FF4444"
-        android:textSize="12sp"
-        android:fontFamily="monospace"
-        app:strokeColor="#FF4444"
-        app:strokeWidth="1dp"
-        app:backgroundTint="#111111"
-        app:layout_constraintBottom_toBottomOf="parent"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintEnd_toEndOf="parent"
-        android:layout_marginBottom="24dp" />
 
 </androidx.constraintlayout.widget.ConstraintLayout>

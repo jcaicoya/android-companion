@@ -23,6 +23,10 @@ class SpeechManager(
     private val handler = Handler(Looper.getMainLooper())
 
     fun start() {
+        if (Looper.myLooper() != Looper.getMainLooper()) {
+            handler.post { start() }
+            return
+        }
         if (active) return
         active = true
         Log.d("SpeechManager", "Starting continuous recognition")
@@ -30,6 +34,10 @@ class SpeechManager(
     }
 
     fun stop() {
+        if (Looper.myLooper() != Looper.getMainLooper()) {
+            handler.post { stop() }
+            return
+        }
         active = false
         recognizer?.destroy()
         recognizer = null
@@ -37,6 +45,10 @@ class SpeechManager(
     }
 
     private fun listen() {
+        if (Looper.myLooper() != Looper.getMainLooper()) {
+            handler.post { listen() }
+            return
+        }
         if (!active) return
 
         recognizer?.destroy()
