@@ -55,6 +55,7 @@ class CompanionService : LifecycleService() {
     private var photoCallback: ((ByteArray) -> Unit)? = null
     private var discoveryJob: Job? = null
     private var microphoneActive = false
+    private var cameraActive = false
     private var shuttingDownFromTaskRemoval = false
 
     fun setPhotoCallback(cb: (ByteArray) -> Unit) { photoCallback = cb }
@@ -133,6 +134,8 @@ class CompanionService : LifecycleService() {
         // Bind camera if permission already granted
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA)
                 == PackageManager.PERMISSION_GRANTED) {
+            cameraActive = true
+            updateForegroundService(connectionStatusText())
             cameraCapture.bindCamera(videoStreamManager.imageAnalysis) {
                 Log.d(TAG, "Camera bound")
             }
@@ -208,6 +211,8 @@ class CompanionService : LifecycleService() {
     fun bindCameraIfNeeded() {
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA)
                 == PackageManager.PERMISSION_GRANTED) {
+            cameraActive = true
+            updateForegroundService(connectionStatusText())
             cameraCapture.bindCamera(videoStreamManager.imageAnalysis) {
                 Log.d(TAG, "Camera bound (deferred)")
             }
@@ -283,8 +288,10 @@ class CompanionService : LifecycleService() {
 
     private fun updateForegroundService(statusText: String) {
         val types = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-            ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC or
-                if (microphoneActive) ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE else 0
+            var t = ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC
+            if (microphoneActive) t = t or ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE
+            if (cameraActive)     t = t or ServiceInfo.FOREGROUND_SERVICE_TYPE_CAMERA
+            t
         } else {
             0
         }

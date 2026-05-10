@@ -1,6 +1,9 @@
 package com.cuarzopolar.companion.capture
 
 import android.content.Context
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
+import android.graphics.Matrix
 import android.util.Log
 import androidx.camera.core.CameraSelector
 import androidx.camera.core.ImageAnalysis
@@ -73,10 +76,20 @@ class CameraCapture(
     }
 
     private fun imageProxyToJpeg(image: ImageProxy): ByteArray {
-        // ImageProxy from ImageCapture is always JPEG format
         val buffer: ByteBuffer = image.planes[0].buffer
         val bytes = ByteArray(buffer.remaining())
         buffer.get(bytes)
-        return bytes
+        val rotation = image.imageInfo.rotationDegrees
+        if (rotation == 0) return bytes
+        val original = BitmapFactory.decodeByteArray(bytes, 0, bytes.size)
+        val rotated = Bitmap.createBitmap(
+            original, 0, 0, original.width, original.height,
+            Matrix().apply { postRotate(rotation.toFloat()) }, true
+        )
+        original.recycle()
+        return ByteArrayOutputStream().also {
+            rotated.compress(Bitmap.CompressFormat.JPEG, 95, it)
+            rotated.recycle()
+        }.toByteArray()
     }
 }

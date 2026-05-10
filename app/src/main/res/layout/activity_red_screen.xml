@@ -1,9 +1,16 @@
 <?xml version="1.0" encoding="utf-8"?>
-<View
-    xmlns:android="http://schemas.android.com/apk/res/android"
-    android:id="@+id/redScreenRoot"
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="#FF0000"
-    android:clickable="true"
-    android:focusable="true" />
+    android:background="#000000">
+
+    <!-- To swap to video: replace this ImageView with a TextureView/VideoView and bind in RedScreenActivity -->
+    <ImageView
+        android:id="@+id/ivCuarzito"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:scaleType="fitCenter"
+        android:src="@drawable/cuarzito"
+        android:contentDescription="@null" />
+
+</FrameLayout>

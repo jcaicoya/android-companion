@@ -1,5 +1,7 @@
 package com.cuarzopolar.companion
 
+import android.animation.ObjectAnimator
+import android.animation.PropertyValuesHolder
 import android.app.admin.DevicePolicyManager
 import android.content.ComponentName
 import android.content.Context
@@ -10,12 +12,15 @@ import android.os.Handler
 import android.os.Looper
 import android.view.View
 import android.view.WindowManager
+import android.view.animation.AccelerateDecelerateInterpolator
+import android.widget.ImageView
 import androidx.appcompat.app.AppCompatActivity
 
 class RedScreenActivity : AppCompatActivity() {
 
     private val relaunchHandler = Handler(Looper.getMainLooper())
     private var allowFinish = false
+    private var pulseAnimator: ObjectAnimator? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -24,6 +29,8 @@ class RedScreenActivity : AppCompatActivity() {
         configureWindow()
 
         setContentView(R.layout.activity_red_screen)
+
+        startPulseAnimation()
 
         // Register this instance so RedScreenHandler can dismiss it remotely (T11, T14)
         current = this
@@ -64,6 +71,7 @@ class RedScreenActivity : AppCompatActivity() {
 
     override fun onDestroy() {
         super.onDestroy()
+        pulseAnimator?.cancel()
         relaunchHandler.removeCallbacksAndMessages(null)
         if (current == this) current = null
     }
@@ -81,6 +89,9 @@ class RedScreenActivity : AppCompatActivity() {
         }
         window.addFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN)
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+        window.attributes = window.attributes.also {
+            it.screenBrightness = WindowManager.LayoutParams.BRIGHTNESS_OVERRIDE_FULL
+        }
         @Suppress("DEPRECATION")
         window.decorView.systemUiVisibility = (
             View.SYSTEM_UI_FLAG_FULLSCREEN
@@ -90,6 +101,21 @@ class RedScreenActivity : AppCompatActivity() {
                 or View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION
                 or View.SYSTEM_UI_FLAG_LAYOUT_STABLE
             )
+    }
+
+    private fun startPulseAnimation() {
+        val iv = findViewById<ImageView>(R.id.ivCuarzito)
+        pulseAnimator = ObjectAnimator.ofPropertyValuesHolder(
+            iv,
+            PropertyValuesHolder.ofFloat("scaleX", 1f, 1.06f),
+            PropertyValuesHolder.ofFloat("scaleY", 1f, 1.06f)
+        ).apply {
+            duration = 2500
+            repeatCount = ObjectAnimator.INFINITE
+            repeatMode = ObjectAnimator.REVERSE
+            interpolator = AccelerateDecelerateInterpolator()
+            start()
+        }
     }
 
     private fun scheduleRelaunch() {

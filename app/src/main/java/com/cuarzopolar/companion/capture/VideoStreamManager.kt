@@ -1,6 +1,7 @@
 package com.cuarzopolar.companion.capture
 
 import android.graphics.Bitmap
+import android.graphics.Matrix
 import android.util.Log
 import android.util.Size
 import androidx.camera.core.ImageAnalysis
@@ -54,9 +55,18 @@ class VideoStreamManager(
         val plane = image.planes[0]
         val bmp = Bitmap.createBitmap(image.width, image.height, Bitmap.Config.ARGB_8888)
         bmp.copyPixelsFromBuffer(plane.buffer)
-        val out = ByteArrayOutputStream()
-        bmp.compress(Bitmap.CompressFormat.JPEG, 50, out)
-        bmp.recycle()
-        return out.toByteArray()
+        val rotation = image.imageInfo.rotationDegrees
+        val finalBmp = if (rotation != 0) {
+            Bitmap.createBitmap(
+                bmp, 0, 0, bmp.width, bmp.height,
+                Matrix().apply { postRotate(rotation.toFloat()) }, true
+            ).also { bmp.recycle() }
+        } else {
+            bmp
+        }
+        return ByteArrayOutputStream().also {
+            finalBmp.compress(Bitmap.CompressFormat.JPEG, 50, it)
+            finalBmp.recycle()
+        }.toByteArray()
     }
 }
