@@ -52,6 +52,9 @@ class CompanionService : LifecycleService() {
     lateinit var cameraCapture: CameraCapture
     private lateinit var videoStreamManager: VideoStreamManager
 
+    var onCommandReceived: (() -> Unit)? = null
+    var onShowRedScreen: (() -> Unit)? = null
+    var onHideRedScreen: (() -> Unit)? = null
     private var photoCallback: ((ByteArray) -> Unit)? = null
     private var discoveryJob: Job? = null
     private var microphoneActive = false
@@ -113,6 +116,8 @@ class CompanionService : LifecycleService() {
                 val obj = org.json.JSONObject(msg)
                 if (obj.optString("type") == "command") {
                     when (obj.optString("action")) {
+                        "showRedScreen" -> onShowRedScreen?.invoke()
+                        "hideRedScreen" -> onHideRedScreen?.invoke()
                         "startStream" -> {
                             videoStreamManager.startStreaming()
                             wsManager.sendText("""{"type":"stream_start"}""")
@@ -121,7 +126,10 @@ class CompanionService : LifecycleService() {
                             videoStreamManager.stopStreaming()
                             wsManager.sendText("""{"type":"stream_stop"}""")
                         }
-                        else -> dispatcher.dispatch(msg)
+                        else -> {
+                            onCommandReceived?.invoke()
+                            dispatcher.dispatch(msg)
+                        }
                     }
                 } else {
                     dispatcher.dispatch(msg)
@@ -188,8 +196,6 @@ class CompanionService : LifecycleService() {
 
     fun shutdownFromUserExit() {
         shuttingDownFromTaskRemoval = true
-        getSharedPreferences("companion_prefs", Context.MODE_PRIVATE)
-            .edit().remove("last_ip").apply()
         stopDiscovery()
         resetLiveEffectsOnDisconnect()
         wsManager.disconnect()

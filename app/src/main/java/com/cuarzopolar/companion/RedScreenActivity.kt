@@ -30,7 +30,10 @@ class RedScreenActivity : AppCompatActivity() {
 
         setContentView(R.layout.activity_red_screen)
 
+        val iv = findViewById<ImageView>(R.id.ivCuarzito)
+        iv.post { applyFillScale(iv, 1.6f) }
         startPulseAnimation()
+        animateGridIn()
 
         // Register this instance so RedScreenHandler can dismiss it remotely (T11, T14)
         current = this
@@ -76,6 +79,7 @@ class RedScreenActivity : AppCompatActivity() {
         if (current == this) current = null
     }
 
+    @Suppress("DEPRECATION")
     private fun configureWindow() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O_MR1) {
             setShowWhenLocked(true)
@@ -101,6 +105,31 @@ class RedScreenActivity : AppCompatActivity() {
                 or View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION
                 or View.SYSTEM_UI_FLAG_LAYOUT_STABLE
             )
+    }
+
+    private fun applyFillScale(iv: ImageView, targetHeightFraction: Float) {
+        val vw = iv.width.toFloat()
+        val vh = iv.height.toFloat()
+        val d = iv.drawable ?: return
+        val imgW = d.intrinsicWidth.toFloat()
+        val imgH = d.intrinsicHeight.toFloat()
+        if (imgW <= 0f || imgH <= 0f) return
+        val fitScale = minOf(vw / imgW, vh / imgH)
+        val renderedH = imgH * fitScale
+        val scale = (vh * targetHeightFraction) / renderedH
+        iv.scaleX = scale
+        iv.scaleY = scale
+    }
+
+    private fun animateGridIn() {
+        val grid = findViewById<LaserGridView>(R.id.laserGrid)
+        grid.alpha = 0f
+        grid.visibility = View.VISIBLE
+        ObjectAnimator.ofFloat(grid, "alpha", 0f, 1f).apply {
+            duration = 500
+            interpolator = AccelerateDecelerateInterpolator()
+            start()
+        }
     }
 
     private fun startPulseAnimation() {

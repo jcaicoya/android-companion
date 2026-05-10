@@ -1,18 +1,22 @@
 package com.cuarzopolar.companion
 
 import android.Manifest
+import android.animation.ObjectAnimator
+import android.animation.PropertyValuesHolder
 import android.app.admin.DevicePolicyManager
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.content.ServiceConnection
-import android.graphics.BitmapFactory
-import android.graphics.Color
 import android.os.Build
 import android.os.Bundle
+import android.os.Handler
 import android.os.IBinder
+import android.os.Looper
 import android.view.LayoutInflater
 import android.view.View
+import android.view.WindowManager
+import android.view.animation.AccelerateDecelerateInterpolator
 import android.widget.EditText
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
@@ -29,17 +33,24 @@ class MainActivity : AppCompatActivity() {
     private lateinit var binding: ActivityMainBinding
     private var service: CompanionService? = null
     private var serviceBound = false
+    private val alertHandler = Handler(Looper.getMainLooper())
+    private var pulseAnimator: ObjectAnimator? = null
+    private var baseScale = 1f
 
     private val serviceConnection = object : ServiceConnection {
         override fun onServiceConnected(name: ComponentName?, binder: IBinder?) {
-            service = (binder as CompanionService.LocalBinder).getService()
+            val svc = (binder as CompanionService.LocalBinder).getService()
+            service = svc
             serviceBound = true
             observeConnectionState()
-            service?.setPhotoCallback { bytes ->
-                runOnUiThread { showTransformedPhoto(bytes) }
-            }
+            svc.onCommandReceived = { runOnUiThread { showAlertState() } }
+            svc.onShowRedScreen  = { runOnUiThread { showLaserGrid() } }
+            svc.onHideRedScreen  = { runOnUiThread { hideLaserGrid() } }
         }
         override fun onServiceDisconnected(name: ComponentName?) {
+            service?.onCommandReceived = null
+            service?.onShowRedScreen  = null
+            service?.onHideRedScreen  = null
             serviceBound = false
             service = null
         }
@@ -62,7 +73,6 @@ class MainActivity : AppCompatActivity() {
         binding = ActivityMainBinding.inflate(layoutInflater)
         setContentView(binding.root)
 
-        // Start service (keeps running even when activity is gone) and bind
         val svcIntent = Intent(this, CompanionService::class.java)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             startForegroundService(svcIntent)
@@ -71,12 +81,9 @@ class MainActivity : AppCompatActivity() {
         }
         bindService(svcIntent, serviceConnection, Context.BIND_AUTO_CREATE)
 
-        // Tap dot or status label → open connect sheet when disconnected
-        binding.tvDot.setOnClickListener    { onStatusTapped() }
-        binding.tvStatus.setOnClickListener { onStatusTapped() }
-
-        // Tap photo overlay to dismiss
-        binding.ivPhoto.setOnClickListener { binding.ivPhoto.visibility = View.GONE }
+        binding.ivCuarzito.setOnClickListener { onCuarzitoTapped() }
+        startPulseAnimation()
+        binding.ivCuarzito.post { applyFillScale(binding.ivCuarzito, 0.85f) }
 
         requestInitialPermissions()
         promptDeviceAdminIfNeeded()
@@ -86,28 +93,72 @@ class MainActivity : AppCompatActivity() {
         val svc = service ?: return
         lifecycleScope.launch {
             svc.connectionState.collectLatest { state ->
-                when (state) {
-                    ConnectionState.CONNECTED -> {
-                        binding.tvDot.setTextColor(Color.parseColor("#00FF00"))
-                        binding.tvStatus.text = getString(R.string.connected)
-                        binding.tvStatus.setTextColor(Color.parseColor("#00FF00"))
+                alertHandler.removeCallbacksAndMessages(null)
+                binding.ivCuarzito.setImageResource(
+                    when (state) {
+                        ConnectionState.CONNECTED    -> R.drawable.cuarzito_connected
+                        ConnectionState.CONNECTING,
+                        ConnectionState.DISCONNECTED -> R.drawable.cuarzito_idle
                     }
-                    ConnectionState.CONNECTING -> {
-                        binding.tvDot.setTextColor(Color.parseColor("#FFAA00"))
-                        binding.tvStatus.text = getString(R.string.connecting)
-                        binding.tvStatus.setTextColor(Color.parseColor("#FFAA00"))
-                    }
-                    ConnectionState.DISCONNECTED -> {
-                        binding.tvDot.setTextColor(Color.parseColor("#FF4444"))
-                        binding.tvStatus.text = getString(R.string.disconnected)
-                        binding.tvStatus.setTextColor(Color.parseColor("#666666"))
-                    }
-                }
+                )
             }
         }
     }
 
-    private fun onStatusTapped() {
+    private fun showLaserGrid() {
+        binding.laserGrid.visibility = View.VISIBLE
+        binding.laserGrid.animateIn()
+        window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+    }
+
+    private fun hideLaserGrid() {
+        binding.laserGrid.animateOut()
+        window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+    }
+
+    private fun showAlertState() {
+        alertHandler.removeCallbacksAndMessages(null)
+        binding.ivCuarzito.setImageResource(R.drawable.cuarzito_alert)
+        alertHandler.postDelayed({
+            if (service?.connectionState?.value == ConnectionState.CONNECTED) {
+                binding.ivCuarzito.setImageResource(R.drawable.cuarzito_connected)
+            }
+        }, 2000)
+    }
+
+    private fun applyFillScale(iv: android.widget.ImageView, targetHeightFraction: Float) {
+        val vw = iv.width.toFloat()
+        val vh = iv.height.toFloat()
+        val d = iv.drawable ?: return
+        val imgW = d.intrinsicWidth.toFloat()
+        val imgH = d.intrinsicHeight.toFloat()
+        if (imgW <= 0f || imgH <= 0f) return
+        val fitScale = minOf(vw / imgW, vh / imgH)
+        val renderedH = imgH * fitScale
+        val scale = (vh * targetHeightFraction) / renderedH
+        baseScale = scale
+        iv.scaleX = scale
+        iv.scaleY = scale
+        iv.translationX = vw * 0.08f
+        pulseAnimator?.cancel()
+        startPulseAnimation()
+    }
+
+    private fun startPulseAnimation() {
+        pulseAnimator = ObjectAnimator.ofPropertyValuesHolder(
+            binding.ivCuarzito,
+            PropertyValuesHolder.ofFloat("scaleX", baseScale, baseScale * 1.06f),
+            PropertyValuesHolder.ofFloat("scaleY", baseScale, baseScale * 1.06f)
+        ).apply {
+            duration = 3000
+            repeatCount = ObjectAnimator.INFINITE
+            repeatMode = ObjectAnimator.REVERSE
+            interpolator = AccelerateDecelerateInterpolator()
+            start()
+        }
+    }
+
+    private fun onCuarzitoTapped() {
         val svc = service ?: return
         if (svc.connectionState.value != ConnectionState.DISCONNECTED) return
         showConnectBottomSheet()
@@ -131,12 +182,6 @@ class MainActivity : AppCompatActivity() {
         }
 
         sheet.show()
-    }
-
-    private fun showTransformedPhoto(bytes: ByteArray) {
-        val bitmap = BitmapFactory.decodeByteArray(bytes, 0, bytes.size) ?: return
-        binding.ivPhoto.setImageBitmap(bitmap)
-        binding.ivPhoto.visibility = View.VISIBLE
     }
 
     private fun requestInitialPermissions() {
@@ -171,11 +216,11 @@ class MainActivity : AppCompatActivity() {
 
     override fun onDestroy() {
         super.onDestroy()
-        if (isFinishing) {
-            service?.shutdownFromUserExit()
-        }
+        pulseAnimator?.cancel()
+        alertHandler.removeCallbacksAndMessages(null)
+        if (isFinishing) service?.shutdownFromUserExit()
         if (serviceBound) {
-            service?.clearPhotoCallback()
+            service?.onCommandReceived = null
             unbindService(serviceConnection)
             serviceBound = false
         }
