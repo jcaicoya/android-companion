@@ -96,9 +96,9 @@ class MainActivity : AppCompatActivity() {
                 alertHandler.removeCallbacksAndMessages(null)
                 binding.ivCuarzito.setImageResource(
                     when (state) {
-                        ConnectionState.CONNECTED    -> R.drawable.cuarzito_connected
-                        ConnectionState.CONNECTING,
-                        ConnectionState.DISCONNECTED -> R.drawable.cuarzito_idle
+                        ConnectionState.CONNECTED    -> R.drawable.cuarzito_green
+                        ConnectionState.CONNECTING   -> R.drawable.cuarzito_amber
+                        ConnectionState.DISCONNECTED -> R.drawable.cuarzito_blue
                     }
                 )
             }
@@ -109,19 +109,23 @@ class MainActivity : AppCompatActivity() {
         binding.laserGrid.visibility = View.VISIBLE
         binding.laserGrid.animateIn()
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+        binding.ivCuarzito.setImageResource(R.drawable.cuarzito_red)
     }
 
     private fun hideLaserGrid() {
         binding.laserGrid.animateOut()
         window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+        if (service?.connectionState?.value == ConnectionState.CONNECTED) {
+            binding.ivCuarzito.setImageResource(R.drawable.cuarzito_green)
+        }
     }
 
     private fun showAlertState() {
         alertHandler.removeCallbacksAndMessages(null)
-        binding.ivCuarzito.setImageResource(R.drawable.cuarzito_alert)
+        binding.ivCuarzito.setImageResource(R.drawable.cuarzito_amber)
         alertHandler.postDelayed({
             if (service?.connectionState?.value == ConnectionState.CONNECTED) {
-                binding.ivCuarzito.setImageResource(R.drawable.cuarzito_connected)
+                binding.ivCuarzito.setImageResource(R.drawable.cuarzito_green)
             }
         }, 2000)
     }
@@ -160,7 +164,7 @@ class MainActivity : AppCompatActivity() {
 
     private fun onCuarzitoTapped() {
         val svc = service ?: return
-        if (svc.connectionState.value != ConnectionState.DISCONNECTED) return
+        if (svc.connectionState.value == ConnectionState.CONNECTED) return
         showConnectBottomSheet()
     }
 
