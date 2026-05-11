@@ -158,16 +158,24 @@ class CompanionService : LifecycleService() {
             startDiscovery()
         }
 
-        // Update notification and re-attempt discovery on disconnect
         lifecycleScope.launch {
             wsManager.connectionState.collect { state ->
-                val text = connectionStatusText(state)
                 if (state == ConnectionState.DISCONNECTED) {
                     resetLiveEffectsOnDisconnect()
                 }
-                updateNotification(text)
-                if (state == ConnectionState.DISCONNECTED && !shuttingDownFromTaskRemoval) startDiscovery()
-                if (state == ConnectionState.CONNECTED)    stopDiscovery()
+                updateNotification(connectionStatusText(state))
+                if (state == ConnectionState.CONNECTED) stopDiscovery()
+            }
+        }
+
+        // When retries are exhausted fall back to UDP discovery so Android reconnects
+        // automatically when Qt restarts — without the user having to tap "Connect".
+        lifecycleScope.launch {
+            wsManager.retriesExhausted.collect { exhausted ->
+                if (exhausted && !shuttingDownFromTaskRemoval) {
+                    Log.d(TAG, "Retries exhausted — starting UDP discovery")
+                    startDiscovery()
+                }
             }
         }
     }
