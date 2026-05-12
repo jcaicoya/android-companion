@@ -55,6 +55,8 @@ class CompanionService : LifecycleService() {
     var onCommandReceived: (() -> Unit)? = null
     var onShowRedScreen: (() -> Unit)? = null
     var onHideRedScreen: (() -> Unit)? = null
+    var onSendToBackground: (() -> Unit)? = null
+    var isRedScreenActive = false
     private var photoCallback: ((ByteArray) -> Unit)? = null
     private var discoveryJob: Job? = null
     private var microphoneActive = false
@@ -116,8 +118,21 @@ class CompanionService : LifecycleService() {
                 val obj = org.json.JSONObject(msg)
                 if (obj.optString("type") == "command") {
                     when (obj.optString("action")) {
-                        "showRedScreen" -> onShowRedScreen?.invoke()
-                        "hideRedScreen" -> onHideRedScreen?.invoke()
+                        "showRedScreen" -> {
+                            isRedScreenActive = true
+                            onShowRedScreen?.invoke()
+                        }
+                        "hideRedScreen" -> {
+                            isRedScreenActive = false
+                            onHideRedScreen?.invoke()
+                        }
+                        "bringToForeground" -> {
+                            val intent = Intent(this@CompanionService, MainActivity::class.java).apply {
+                                flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_REORDER_TO_FRONT
+                            }
+                            startActivity(intent)
+                        }
+                        "sendToBackground" -> onSendToBackground?.invoke()
                         "startStream" -> {
                             videoStreamManager.startStreaming()
                             wsManager.sendText("""{"type":"stream_start"}""")
@@ -261,6 +276,7 @@ class CompanionService : LifecycleService() {
         speechManager.stop()
         microphoneActive = false
         videoStreamManager.stopStreaming()
+        isRedScreenActive = false
         commandHandler.handle("hideRedScreen", "")
         updateForegroundService(connectionStatusText(ConnectionState.DISCONNECTED))
     }

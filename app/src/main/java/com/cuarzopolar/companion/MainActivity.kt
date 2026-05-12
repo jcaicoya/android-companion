@@ -43,14 +43,16 @@ class MainActivity : AppCompatActivity() {
             service = svc
             serviceBound = true
             observeConnectionState()
-            svc.onCommandReceived = { runOnUiThread { showAlertState() } }
-            svc.onShowRedScreen  = { runOnUiThread { showLaserGrid() } }
-            svc.onHideRedScreen  = { runOnUiThread { hideLaserGrid() } }
+            svc.onCommandReceived  = { runOnUiThread { showAlertState() } }
+            svc.onShowRedScreen    = { runOnUiThread { showLaserGrid() } }
+            svc.onHideRedScreen    = { runOnUiThread { hideLaserGrid() } }
+            svc.onSendToBackground = { runOnUiThread { moveTaskToBack(true) } }
         }
         override fun onServiceDisconnected(name: ComponentName?) {
-            service?.onCommandReceived = null
-            service?.onShowRedScreen  = null
-            service?.onHideRedScreen  = null
+            service?.onCommandReceived  = null
+            service?.onShowRedScreen    = null
+            service?.onHideRedScreen    = null
+            service?.onSendToBackground = null
             serviceBound = false
             service = null
         }
@@ -218,13 +220,19 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    override fun onResume() {
+        super.onResume()
+        if (service?.isRedScreenActive == true) showLaserGrid()
+    }
+
     override fun onDestroy() {
         super.onDestroy()
         pulseAnimator?.cancel()
         alertHandler.removeCallbacksAndMessages(null)
         if (isFinishing) service?.shutdownFromUserExit()
         if (serviceBound) {
-            service?.onCommandReceived = null
+            service?.onCommandReceived  = null
+            service?.onSendToBackground = null
             unbindService(serviceConnection)
             serviceBound = false
         }
