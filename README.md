@@ -53,17 +53,28 @@ Implemented:
 
 ## Connecting To The Laptop
 
-Preferred show flow:
+**Preferred show flow (via Orchestrator):**
+
+1. Connect the Android device by USB (or WiFi ADB).
+2. In the Orchestrator → CONFIGURAR → ADB tab: press **Detectar** to confirm the device is visible.
+3. Go to ENSAYO → Apps Android: press **Lanzar** on "Companion".
+   - The orchestrator runs `adb reverse tcp:8765 tcp:8765` and then launches the app.
+4. Start `ataque-inicial` from the Orchestrator (Rundown or Qt tab).
+5. Android connects to `localhost:8765` through the ADB reverse tunnel.
+
+**Fallback (without Orchestrator or when ADB is not available):**
 
 1. Start the Qt `ataque-inicial` app on the laptop.
-2. Put laptop and Android device on the same Wi-Fi network, ideally the laptop's Windows Mobile Hotspot.
-3. Android listens for the Qt UDP beacon and connects automatically.
-4. If auto-discovery fails, tap the Android status dot while disconnected and enter the laptop IP manually.
+2. Put laptop and Android device on the same Wi-Fi network (laptop's Windows Mobile Hotspot recommended).
+3. On startup, Android first tries `localhost:8765` (3 retries, ~7 s).
+4. If localhost fails, Android listens for the Qt UDP beacon and connects automatically.
+5. If auto-discovery also fails, tap the Android status dot while disconnected and enter the laptop IP manually.
 
 Qt WebSocket endpoint:
 
 ```text
-ws://<laptop-ip>:8765
+ws://localhost:8765   ← via ADB reverse tunnel (preferred)
+ws://<laptop-ip>:8765 ← direct WiFi (fallback)
 ```
 
 ## Kiosk / Device Owner Option

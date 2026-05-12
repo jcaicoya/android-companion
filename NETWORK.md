@@ -6,10 +6,12 @@ Everything here is for theatrical show control. No real device compromise is per
 
 ## Current Architecture
 
-- Qt laptop app: WebSocket server on port `8765`.
+- Qt laptop app (`ataque-inicial`): WebSocket server on port `8765`.
 - Android companion: WebSocket client.
-- Discovery: Qt broadcasts UDP beacons; Android listens and auto-connects.
-- Manual fallback: Android bottom sheet accepts a laptop IP.
+- **Primary connection path:** ADB reverse tunnel (`adb reverse tcp:8765 tcp:8765`) set up by the
+  Orchestrator before launching the Android app. Android connects to `localhost:8765`.
+- **Fallback path (no ADB/Orchestrator):** Android tries `localhost:8765` for 3 retries (~7 s),
+  then falls back to UDP beacon discovery, then manual IP entry.
 - Text protocol: compact JSON over WebSocket text frames.
 - Binary protocol: JPEG data over WebSocket binary frames.
 - Heartbeat: Qt sends `ping`; Android replies `pong`.
@@ -31,9 +33,10 @@ This avoids venue Wi-Fi variability and usually gives the laptop a predictable a
 ### Startup
 
 1. Android starts `CompanionService` as a foreground service.
-2. If a saved IP exists, Android tries it.
-3. If not connected, Android waits for Qt UDP discovery.
-4. On connection, Android sends:
+2. Android tries `localhost:8765` immediately (ADB reverse tunnel path).
+3. If 3 retries fail (~7 s), Android starts `UdpDiscovery` and listens for Qt's beacon.
+4. Manual fallback: tap the Android status dot to enter the laptop IP.
+5. On connection, Android sends:
 
 ```json
 {"type":"status","deviceName":"<android model>"}
