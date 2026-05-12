@@ -14,6 +14,7 @@ import android.content.pm.ServiceInfo
 import android.os.Binder
 import android.os.Build
 import android.os.IBinder
+import android.os.PowerManager
 import android.util.Log
 import androidx.core.app.ServiceCompat
 import androidx.core.content.ContextCompat
@@ -33,7 +34,10 @@ import kotlinx.coroutines.launch
 
 private const val TAG = "CompanionService"
 private const val CHANNEL_ID = "companion_channel"
+private const val CHANNEL_PRIORITY_ID = "companion_priority_channel"
 private const val NOTIF_ID = 1
+private const val NOTIF_BRING_TO_FRONT_ID = 2
+private const val REQUEST_CODE_BRING_TO_FRONT = 100
 
 class CompanionService : LifecycleService() {
 
@@ -52,11 +56,15 @@ class CompanionService : LifecycleService() {
     lateinit var cameraCapture: CameraCapture
     private lateinit var videoStreamManager: VideoStreamManager
 
-    var onCommandReceived: (() -> Unit)? = null
+    var onCommandReceived: ((String) -> Unit)? = null
     var onShowRedScreen: (() -> Unit)? = null
     var onHideRedScreen: (() -> Unit)? = null
     var onSendToBackground: (() -> Unit)? = null
+    var onStreamStarted: (() -> Unit)? = null
+    var onStreamStopped: (() -> Unit)? = null
     var isRedScreenActive = false
+    var isStreamActive = false
+    val isMicActive: Boolean get() = microphoneActive
     private var photoCallback: ((ByteArray) -> Unit)? = null
     private var discoveryJob: Job? = null
     private var microphoneActive = false
@@ -126,23 +134,23 @@ class CompanionService : LifecycleService() {
                             isRedScreenActive = false
                             onHideRedScreen?.invoke()
                         }
-                        "bringToForeground" -> {
-                            val intent = Intent(this@CompanionService, MainActivity::class.java).apply {
-                                flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_REORDER_TO_FRONT
-                            }
-                            startActivity(intent)
-                        }
+                        "bringToForeground" -> bringAppToFront()
                         "sendToBackground" -> onSendToBackground?.invoke()
+                        "wakeScreen" -> wakeAndShowApp()
                         "startStream" -> {
+                            isStreamActive = true
                             videoStreamManager.startStreaming()
                             wsManager.sendText("""{"type":"stream_start"}""")
+                            onStreamStarted?.invoke()
                         }
                         "stopStream" -> {
+                            isStreamActive = false
                             videoStreamManager.stopStreaming()
                             wsManager.sendText("""{"type":"stream_stop"}""")
+                            onStreamStopped?.invoke()
                         }
                         else -> {
-                            onCommandReceived?.invoke()
+                            onCommandReceived?.invoke(obj.optString("action"))
                             dispatcher.dispatch(msg)
                         }
                     }
@@ -254,6 +262,49 @@ class CompanionService : LifecycleService() {
         return dpm.isAdminActive(comp)
     }
 
+    private fun bringAppToFront() {
+        val intent = Intent(this, MainActivity::class.java).apply {
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_REORDER_TO_FRONT
+        }
+        if (android.provider.Settings.canDrawOverlays(this)) {
+            // SYSTEM_ALERT_WINDOW is an explicit exemption from background activity launch restrictions
+            startActivity(intent)
+        } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            val pi = PendingIntent.getActivity(
+                this, REQUEST_CODE_BRING_TO_FRONT, intent,
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+            )
+            val notif = Notification.Builder(this, CHANNEL_PRIORITY_ID)
+                .setSmallIcon(android.R.drawable.ic_dialog_info)
+                .setContentTitle("CuarzoPolar")
+                .setContentText("Volviendo al primer plano…")
+                .setFullScreenIntent(pi, true)
+                .setAutoCancel(true)
+                .build()
+            val nm = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+            nm.notify(NOTIF_BRING_TO_FRONT_ID, notif)
+            android.os.Handler(android.os.Looper.getMainLooper()).postDelayed(
+                { nm.cancel(NOTIF_BRING_TO_FRONT_ID) }, 3000L
+            )
+        } else {
+            startActivity(intent)
+        }
+    }
+
+    private fun wakeAndShowApp() {
+        val pm = getSystemService(Context.POWER_SERVICE) as PowerManager
+        if (!pm.isInteractive) {
+            @Suppress("DEPRECATION")
+            pm.newWakeLock(
+                PowerManager.SCREEN_BRIGHT_WAKE_LOCK or PowerManager.ACQUIRE_CAUSES_WAKEUP,
+                "CuarzoPolar::wakeScreen"
+            ).acquire(3000L)
+        }
+        startActivity(Intent(this, MainActivity::class.java).apply {
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_REORDER_TO_FRONT
+        })
+    }
+
     private fun startDiscovery() {
         if (discoveryJob?.isActive == true) return
         discoveryJob = lifecycleScope.launch {
@@ -275,6 +326,7 @@ class CompanionService : LifecycleService() {
         Log.d(TAG, "Connection lost; returning companion to normal mode")
         speechManager.stop()
         microphoneActive = false
+        isStreamActive = false
         videoStreamManager.stopStreaming()
         isRedScreenActive = false
         commandHandler.handle("hideRedScreen", "")
@@ -282,16 +334,22 @@ class CompanionService : LifecycleService() {
     }
 
     private fun createNotificationChannel() {
-        val channel = NotificationChannel(
-            CHANNEL_ID, "CuarzoPolar Companion",
-            NotificationManager.IMPORTANCE_LOW
-        ).apply {
-            setSound(null, null)
-            enableVibration(false)
-            description = "Mantiene la conexión con la consola del operador"
-        }
         val nm = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-        nm.createNotificationChannel(channel)
+        nm.createNotificationChannel(
+            NotificationChannel(CHANNEL_ID, "CuarzoPolar Companion", NotificationManager.IMPORTANCE_LOW).apply {
+                setSound(null, null)
+                enableVibration(false)
+                description = "Mantiene la conexión con la consola del operador"
+            }
+        )
+        // HIGH importance channel required for full-screen intent on Android 10+
+        nm.createNotificationChannel(
+            NotificationChannel(CHANNEL_PRIORITY_ID, "CuarzoPolar Alerta", NotificationManager.IMPORTANCE_HIGH).apply {
+                setSound(null, null)
+                enableVibration(false)
+                description = "Trae la app al primer plano"
+            }
+        )
     }
 
     private fun buildNotification(statusText: String): Notification {

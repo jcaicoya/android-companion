@@ -3,12 +3,15 @@ package com.cuarzopolar.companion
 import android.Manifest
 import android.animation.ObjectAnimator
 import android.animation.PropertyValuesHolder
+import android.app.NotificationManager
 import android.app.admin.DevicePolicyManager
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.content.ServiceConnection
+import android.net.Uri
 import android.os.Build
+import android.provider.Settings
 import android.os.Bundle
 import android.os.Handler
 import android.os.IBinder
@@ -18,6 +21,7 @@ import android.view.View
 import android.view.WindowManager
 import android.view.animation.AccelerateDecelerateInterpolator
 import android.widget.EditText
+import androidx.activity.OnBackPressedCallback
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
@@ -36,6 +40,8 @@ class MainActivity : AppCompatActivity() {
     private val alertHandler = Handler(Looper.getMainLooper())
     private var pulseAnimator: ObjectAnimator? = null
     private var baseScale = 1f
+    private var micActive = false
+    private var streamActive = false
 
     private val serviceConnection = object : ServiceConnection {
         override fun onServiceConnected(name: ComponentName?, binder: IBinder?) {
@@ -43,16 +49,20 @@ class MainActivity : AppCompatActivity() {
             service = svc
             serviceBound = true
             observeConnectionState()
-            svc.onCommandReceived  = { runOnUiThread { showAlertState() } }
+            svc.onCommandReceived  = { action -> runOnUiThread { onCommand(action) } }
             svc.onShowRedScreen    = { runOnUiThread { showLaserGrid() } }
             svc.onHideRedScreen    = { runOnUiThread { hideLaserGrid() } }
             svc.onSendToBackground = { runOnUiThread { moveTaskToBack(true) } }
+            svc.onStreamStarted    = { runOnUiThread { streamActive = true;  updateCuarzitoColor() } }
+            svc.onStreamStopped    = { runOnUiThread { streamActive = false; updateCuarzitoColor() } }
         }
         override fun onServiceDisconnected(name: ComponentName?) {
             service?.onCommandReceived  = null
             service?.onShowRedScreen    = null
             service?.onHideRedScreen    = null
             service?.onSendToBackground = null
+            service?.onStreamStarted    = null
+            service?.onStreamStopped    = null
             serviceBound = false
             service = null
         }
@@ -75,6 +85,12 @@ class MainActivity : AppCompatActivity() {
         binding = ActivityMainBinding.inflate(layoutInflater)
         setContentView(binding.root)
 
+        onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
+            override fun handleOnBackPressed() { /* blocked intentionally */ }
+        })
+
+        applyLockScreenFlags()
+
         val svcIntent = Intent(this, CompanionService::class.java)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             startForegroundService(svcIntent)
@@ -89,6 +105,8 @@ class MainActivity : AppCompatActivity() {
 
         requestInitialPermissions()
         promptDeviceAdminIfNeeded()
+        promptDrawOverlaysIfNeeded()
+        requestFullScreenIntentPermissionIfNeeded()
     }
 
     private fun observeConnectionState() {
@@ -96,6 +114,10 @@ class MainActivity : AppCompatActivity() {
         lifecycleScope.launch {
             svc.connectionState.collectLatest { state ->
                 alertHandler.removeCallbacksAndMessages(null)
+                if (state == ConnectionState.DISCONNECTED) {
+                    micActive = false
+                    streamActive = false
+                }
                 binding.ivCuarzito.setImageResource(
                     when (state) {
                         ConnectionState.CONNECTED    -> R.drawable.cuarzito_green
@@ -111,25 +133,38 @@ class MainActivity : AppCompatActivity() {
         binding.laserGrid.visibility = View.VISIBLE
         binding.laserGrid.animateIn()
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
-        binding.ivCuarzito.setImageResource(R.drawable.cuarzito_red)
+        updateCuarzitoColor()
     }
 
     private fun hideLaserGrid() {
         binding.laserGrid.animateOut()
         window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
-        if (service?.connectionState?.value == ConnectionState.CONNECTED) {
-            binding.ivCuarzito.setImageResource(R.drawable.cuarzito_green)
+        updateCuarzitoColor()
+    }
+
+    private fun onCommand(action: String) {
+        when (action) {
+            "startMic" -> { micActive = true;  updateCuarzitoColor() }
+            "stopMic"  -> { micActive = false; updateCuarzitoColor() }
+            "vibrate"  -> flashRed(2000)
+            "playSound", "takePhoto" -> flashRed(4000)
+            else -> flashRed(2000)
         }
     }
 
-    private fun showAlertState() {
+    private fun flashRed(durationMs: Long) {
         alertHandler.removeCallbacksAndMessages(null)
-        binding.ivCuarzito.setImageResource(R.drawable.cuarzito_amber)
-        alertHandler.postDelayed({
-            if (service?.connectionState?.value == ConnectionState.CONNECTED) {
-                binding.ivCuarzito.setImageResource(R.drawable.cuarzito_green)
-            }
-        }, 2000)
+        binding.ivCuarzito.setImageResource(R.drawable.cuarzito_red)
+        alertHandler.postDelayed({ updateCuarzitoColor() }, durationMs)
+    }
+
+    private fun updateCuarzitoColor() {
+        val svc = service ?: return
+        if (svc.isRedScreenActive || micActive || streamActive) {
+            binding.ivCuarzito.setImageResource(R.drawable.cuarzito_red)
+        } else if (svc.connectionState.value == ConnectionState.CONNECTED) {
+            binding.ivCuarzito.setImageResource(R.drawable.cuarzito_green)
+        }
     }
 
     private fun applyFillScale(iv: android.widget.ImageView, targetHeightFraction: Float) {
@@ -203,6 +238,29 @@ class MainActivity : AppCompatActivity() {
         if (needed.isNotEmpty()) requestPermissions.launch(needed.toTypedArray())
     }
 
+    private fun requestFullScreenIntentPermissionIfNeeded() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+            val nm = getSystemService(NotificationManager::class.java)
+            if (!nm.canUseFullScreenIntent()) {
+                startActivity(Intent("android.settings.MANAGE_APP_USE_FULL_SCREEN_INTENTS").apply {
+                    data = Uri.parse("package:$packageName")
+                })
+            }
+        }
+    }
+
+    private fun promptDrawOverlaysIfNeeded() {
+        if (!Settings.canDrawOverlays(this)) {
+            val prefs = getSharedPreferences("companion_prefs", Context.MODE_PRIVATE)
+            if (!prefs.getBoolean("overlay_prompted", false)) {
+                prefs.edit().putBoolean("overlay_prompted", true).apply()
+                startActivity(Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION).apply {
+                    data = Uri.parse("package:$packageName")
+                })
+            }
+        }
+    }
+
     private fun promptDeviceAdminIfNeeded() {
         val dpm = getSystemService(Context.DEVICE_POLICY_SERVICE) as DevicePolicyManager
         val comp = ComponentName(this, CompanionDeviceAdminReceiver::class.java)
@@ -222,7 +280,25 @@ class MainActivity : AppCompatActivity() {
 
     override fun onResume() {
         super.onResume()
-        if (service?.isRedScreenActive == true) showLaserGrid()
+        service?.let { svc ->
+            micActive    = svc.isMicActive
+            streamActive = svc.isStreamActive
+            if (svc.isRedScreenActive) showLaserGrid()
+        }
+        updateCuarzitoColor()
+    }
+
+    private fun applyLockScreenFlags() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O_MR1) {
+            setShowWhenLocked(true)
+            setTurnScreenOn(true)
+        } else {
+            @Suppress("DEPRECATION")
+            window.addFlags(
+                WindowManager.LayoutParams.FLAG_SHOW_WHEN_LOCKED or
+                WindowManager.LayoutParams.FLAG_TURN_SCREEN_ON
+            )
+        }
     }
 
     override fun onDestroy() {
@@ -233,6 +309,8 @@ class MainActivity : AppCompatActivity() {
         if (serviceBound) {
             service?.onCommandReceived  = null
             service?.onSendToBackground = null
+            service?.onStreamStarted    = null
+            service?.onStreamStopped    = null
             unbindService(serviceConnection)
             serviceBound = false
         }
