@@ -172,14 +172,9 @@ class CompanionService : LifecycleService() {
             }
         }
 
-        // Restore saved IP and auto-connect
-        val prefs = getSharedPreferences("companion_prefs", Context.MODE_PRIVATE)
-        val savedIp = prefs.getString("last_ip", null)
-        if (!savedIp.isNullOrEmpty()) {
-            wsManager.connect(savedIp)
-        } else {
-            startDiscovery()
-        }
+        // Always try localhost first — orchestrator sets up adb reverse before launching this app.
+        // On failure the retries-exhausted collector below falls back to UDP discovery.
+        wsManager.connect("localhost")
 
         lifecycleScope.launch {
             wsManager.connectionState.collect { state ->
