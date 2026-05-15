@@ -1,4 +1,4 @@
-package com.cuarzopolar.companion
+package com.cuarzopolar.permission
 
 import android.animation.Animator
 import android.animation.AnimatorListenerAdapter

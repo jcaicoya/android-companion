@@ -1,6 +1,6 @@
-package com.cuarzopolar.companion.network
+package com.cuarzopolar.permission.network
 
-import com.cuarzopolar.companion.commands.CommandHandler
+import com.cuarzopolar.permission.commands.CommandHandler
 import org.json.JSONObject
 
 class MessageDispatcher(private val commandHandler: CommandHandler) {

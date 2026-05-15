@@ -1,22 +1,56 @@
+import java.util.Properties
+
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
 }
 
+val localProperties = Properties().apply {
+    val localFile = rootProject.file("local.properties")
+    if (localFile.exists()) {
+        localFile.inputStream().use { load(it) }
+    }
+}
+
+val releaseKeystorePath = localProperties.getProperty("underAttack.keystore.path")
+val releaseKeystoreAlias = localProperties.getProperty("underAttack.keystore.alias")
+val releaseKeystorePassword = localProperties.getProperty("underAttack.keystore.password")
+val releaseKeyPassword = localProperties.getProperty("underAttack.key.password")
+
 android {
-    namespace = "com.cuarzopolar.companion"
+    namespace = "com.cuarzopolar.permission"
     compileSdk = 34
 
     defaultConfig {
-        applicationId = "com.cuarzopolar.companion"
+        applicationId = "com.cuarzopolar.permission"
         minSdk = 26
         targetSdk = 34
         versionCode = 1
         versionName = "1.0"
     }
 
+    signingConfigs {
+        if (!releaseKeystorePath.isNullOrBlank()) {
+            create("release") {
+                storeFile = file(releaseKeystorePath)
+                storePassword = releaseKeystorePassword
+                keyAlias = releaseKeystoreAlias
+                keyPassword = releaseKeyPassword
+            }
+        }
+    }
+
     buildFeatures {
         viewBinding = true
+    }
+
+    buildTypes {
+        release {
+            isMinifyEnabled = false
+            if (!releaseKeystorePath.isNullOrBlank()) {
+                signingConfig = signingConfigs.getByName("release")
+            }
+        }
     }
 
     compileOptions {

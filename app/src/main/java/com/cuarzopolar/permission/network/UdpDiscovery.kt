@@ -1,4 +1,4 @@
-package com.cuarzopolar.companion.network
+package com.cuarzopolar.permission.network
 
 import android.util.Log
 import kotlinx.coroutines.CancellationException

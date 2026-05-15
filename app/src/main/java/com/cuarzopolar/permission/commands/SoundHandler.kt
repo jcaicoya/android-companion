@@ -1,4 +1,4 @@
-package com.cuarzopolar.companion.commands
+package com.cuarzopolar.permission.commands
 
 import android.content.Context
 import android.media.AudioAttributes

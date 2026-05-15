@@ -3,9 +3,6 @@ build/
 app/build/
 .gradle/
 
-# Gradle wrapper jar (binary, downloaded on first sync)
-gradle/wrapper/gradle-wrapper.jar
-
 # Local SDK path — set your own in local.properties
 local.properties
 
@@ -24,6 +21,7 @@ lint/
 # Keystore files
 *.jks
 *.keystore
+dist/
 
 # OS
 .DS_Store

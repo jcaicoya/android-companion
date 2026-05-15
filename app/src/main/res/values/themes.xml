@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <style name="Theme.Companion" parent="Theme.MaterialComponents.DayNight.NoActionBar">
+    <style name="Theme.Permission" parent="Theme.MaterialComponents.DayNight.NoActionBar">
         <item name="colorPrimary">@color/green_accent</item>
         <item name="colorPrimaryVariant">@color/amber_accent</item>
         <item name="colorOnPrimary">@color/black</item>

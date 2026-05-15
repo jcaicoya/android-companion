@@ -1,11 +1,11 @@
-package com.cuarzopolar.companion
+package com.cuarzopolar.permission
 
 import android.app.admin.DeviceAdminReceiver
 import android.content.Context
 import android.content.Intent
 import android.util.Log
 
-class CompanionDeviceAdminReceiver : DeviceAdminReceiver() {
+class PermissionDeviceAdminReceiver : DeviceAdminReceiver() {
     override fun onEnabled(context: Context, intent: Intent) {
         Log.d("DeviceAdmin", "Device admin enabled")
     }

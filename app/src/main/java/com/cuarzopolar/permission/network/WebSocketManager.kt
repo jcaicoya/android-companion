@@ -1,4 +1,4 @@
-package com.cuarzopolar.companion.network
+package com.cuarzopolar.permission.network
 
 import android.os.Build
 import android.util.Log

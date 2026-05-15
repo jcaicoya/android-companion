@@ -1,6 +1,6 @@
-# CuarzoPolar - Android Companion
+# Permission Android
 
-Mobile companion app for the `ataque-inicial` cybershow. It runs on the actor/show tablet or phone and acts as the controlled mobile target for the Qt laptop app.
+Mobile companion app for the `permission_qt` cybershow. It runs on the actor/show tablet or phone and acts as the controlled mobile target for the Qt laptop app.
 
 The app communicates with the Qt desktop app over WebSocket on port `8765`, using the same local Wi-Fi network or Windows Mobile Hotspot.
 
@@ -59,12 +59,12 @@ Implemented:
 2. In the Orchestrator → CONFIGURAR → ADB tab: press **Detectar** to confirm the device is visible.
 3. Go to ENSAYO → Apps Android: press **Lanzar** on "Companion".
    - The orchestrator runs `adb reverse tcp:8765 tcp:8765` and then launches the app.
-4. Start `ataque-inicial` from the Orchestrator (Rundown or Qt tab).
+4. Start `permission_qt` from the Orchestrator (Rundown or Qt tab).
 5. Android connects to `localhost:8765` through the ADB reverse tunnel.
 
 **Fallback (without Orchestrator or when ADB is not available):**
 
-1. Start the Qt `ataque-inicial` app on the laptop.
+1. Start the Qt `permission_qt` app on the laptop.
 2. Put laptop and Android device on the same Wi-Fi network (laptop's Windows Mobile Hotspot recommended).
 3. On startup, Android first tries `localhost:8765` (3 retries, ~7 s).
 4. If localhost fails, Android listens for the Qt UDP beacon and connects automatically.
@@ -85,7 +85,7 @@ Typical setup on a freshly reset Android device:
 
 ```powershell
 adb install app\build\outputs\apk\debug\app-debug.apk
-adb shell dpm set-device-owner com.cuarzopolar.companion/.CompanionDeviceAdminReceiver
+adb shell dpm set-device-owner com.cuarzopolar.permission/.PermissionDeviceAdminReceiver
 ```
 
 If Android refuses because the device is already provisioned or has accounts, factory reset and run the command earlier in setup.
@@ -115,5 +115,5 @@ If Android refuses because the device is already provisioned or has accounts, fa
 | App | Role |
 |---|---|
 | `qr` | QR code interaction screen |
-| `ataque-inicial` | Radar scan + mobile control console |
-| `android-companion` | Controlled mobile target |
+| `permission_qt` | Radar scan + mobile control console |
+| `permission_android` | Controlled mobile target |

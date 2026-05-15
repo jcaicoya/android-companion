@@ -1,4 +1,4 @@
-package com.cuarzopolar.companion
+package com.cuarzopolar.permission
 
 import android.Manifest
 import android.animation.ObjectAnimator
@@ -26,8 +26,8 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.lifecycleScope
-import com.cuarzopolar.companion.databinding.ActivityMainBinding
-import com.cuarzopolar.companion.network.ConnectionState
+import com.cuarzopolar.permission.databinding.ActivityMainBinding
+import com.cuarzopolar.permission.network.ConnectionState
 import com.google.android.material.bottomsheet.BottomSheetDialog
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
@@ -35,7 +35,7 @@ import kotlinx.coroutines.launch
 class MainActivity : AppCompatActivity() {
 
     private lateinit var binding: ActivityMainBinding
-    private var service: CompanionService? = null
+    private var service: PermissionService? = null
     private var serviceBound = false
     private val alertHandler = Handler(Looper.getMainLooper())
     private var pulseAnimator: ObjectAnimator? = null
@@ -45,7 +45,7 @@ class MainActivity : AppCompatActivity() {
 
     private val serviceConnection = object : ServiceConnection {
         override fun onServiceConnected(name: ComponentName?, binder: IBinder?) {
-            val svc = (binder as CompanionService.LocalBinder).getService()
+            val svc = (binder as PermissionService.LocalBinder).getService()
             service = svc
             serviceBound = true
             observeConnectionState()
@@ -91,7 +91,7 @@ class MainActivity : AppCompatActivity() {
 
         applyLockScreenFlags()
 
-        val svcIntent = Intent(this, CompanionService::class.java)
+        val svcIntent = Intent(this, PermissionService::class.java)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             startForegroundService(svcIntent)
         } else {
@@ -211,7 +211,7 @@ class MainActivity : AppCompatActivity() {
         sheet.setContentView(sheetView)
 
         val etIp = sheetView.findViewById<EditText>(R.id.etIp)
-        val prefs = getSharedPreferences("companion_prefs", Context.MODE_PRIVATE)
+        val prefs = getSharedPreferences("permission_prefs", Context.MODE_PRIVATE)
         etIp.setText(prefs.getString("last_ip", ""))
 
         sheetView.findViewById<View>(R.id.btnConnect).setOnClickListener {
@@ -251,7 +251,7 @@ class MainActivity : AppCompatActivity() {
 
     private fun promptDrawOverlaysIfNeeded() {
         if (!Settings.canDrawOverlays(this)) {
-            val prefs = getSharedPreferences("companion_prefs", Context.MODE_PRIVATE)
+            val prefs = getSharedPreferences("permission_prefs", Context.MODE_PRIVATE)
             if (!prefs.getBoolean("overlay_prompted", false)) {
                 prefs.edit().putBoolean("overlay_prompted", true).apply()
                 startActivity(Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION).apply {
@@ -263,9 +263,9 @@ class MainActivity : AppCompatActivity() {
 
     private fun promptDeviceAdminIfNeeded() {
         val dpm = getSystemService(Context.DEVICE_POLICY_SERVICE) as DevicePolicyManager
-        val comp = ComponentName(this, CompanionDeviceAdminReceiver::class.java)
+        val comp = ComponentName(this, PermissionDeviceAdminReceiver::class.java)
         if (!dpm.isAdminActive(comp)) {
-            val prefs = getSharedPreferences("companion_prefs", Context.MODE_PRIVATE)
+            val prefs = getSharedPreferences("permission_prefs", Context.MODE_PRIVATE)
             if (!prefs.getBoolean("admin_prompted", false)) {
                 prefs.edit().putBoolean("admin_prompted", true).apply()
                 val intent = Intent(DevicePolicyManager.ACTION_ADD_DEVICE_ADMIN).apply {

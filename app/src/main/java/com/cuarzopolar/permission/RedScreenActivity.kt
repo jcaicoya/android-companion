@@ -1,4 +1,4 @@
-package com.cuarzopolar.companion
+package com.cuarzopolar.permission
 
 import android.animation.ObjectAnimator
 import android.animation.PropertyValuesHolder
@@ -162,7 +162,7 @@ class RedScreenActivity : AppCompatActivity() {
         val dpm = getSystemService(Context.DEVICE_POLICY_SERVICE) as DevicePolicyManager
         if (!dpm.isDeviceOwnerApp(packageName)) return
 
-        val admin = ComponentName(this, CompanionDeviceAdminReceiver::class.java)
+        val admin = ComponentName(this, PermissionDeviceAdminReceiver::class.java)
         runCatching {
             dpm.setLockTaskPackages(admin, arrayOf(packageName))
             startLockTask()
@@ -180,7 +180,7 @@ class RedScreenActivity : AppCompatActivity() {
     }
 
     companion object {
-        const val PREFS = "companion_prefs"
+        const val PREFS = "permission_prefs"
         const val KEY_ACTIVE = "red_screen_active"
 
         private var current: RedScreenActivity? = null

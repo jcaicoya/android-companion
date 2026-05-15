@@ -20,7 +20,7 @@
         android:icon="@mipmap/ic_launcher"
         android:roundIcon="@mipmap/ic_launcher_round"
         android:label="@string/app_name"
-        android:theme="@style/Theme.Companion"
+        android:theme="@style/Theme.Permission"
         android:supportsRtl="true"
         android:usesCleartextTraffic="true">
 
@@ -39,15 +39,15 @@
             android:exported="false"
             android:screenOrientation="fullSensor"
             android:showOnLockScreen="true"
-            android:theme="@style/Theme.Companion" />
+            android:theme="@style/Theme.Permission" />
 
         <service
-            android:name=".CompanionService"
+            android:name=".PermissionService"
             android:exported="false"
             android:foregroundServiceType="dataSync|microphone|camera" />
 
         <receiver
-            android:name=".CompanionDeviceAdminReceiver"
+            android:name=".PermissionDeviceAdminReceiver"
             android:exported="true"
             android:permission="android.permission.BIND_DEVICE_ADMIN">
             <meta-data

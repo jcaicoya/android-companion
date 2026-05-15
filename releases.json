@@ -1,0 +1,11 @@
+{
+  "releases": [
+    {
+      "version": 0,
+      "commit": "bc9e414",
+      "date": "2026-05-15T18:57:57",
+      "message": "Fix app name to Permission; update launcher icon (cuarzito_green, dark background)",
+      "apk": "under_attack_permission_android-v00.apk"
+    }
+  ]
+}

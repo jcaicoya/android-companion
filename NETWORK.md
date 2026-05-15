@@ -1,12 +1,12 @@
-# Networking - Android Companion
+# Networking - Permission Android
 
-This document tracks the current network behavior between the Android companion app and the Qt `ataque-inicial` laptop app.
+This document tracks the current network behavior between the Android companion app and the Qt `permission_qt` laptop app.
 
 Everything here is for theatrical show control. No real device compromise is performed.
 
 ## Current Architecture
 
-- Qt laptop app (`ataque-inicial`): WebSocket server on port `8765`.
+- Qt laptop app (`permission_qt`): WebSocket server on port `8765`.
 - Android companion: WebSocket client.
 - **Primary connection path:** ADB reverse tunnel (`adb reverse tcp:8765 tcp:8765`) set up by the
   Orchestrator before launching the Android app. Android connects to `localhost:8765`.
@@ -32,7 +32,7 @@ This avoids venue Wi-Fi variability and usually gives the laptop a predictable a
 
 ### Startup
 
-1. Android starts `CompanionService` as a foreground service.
+1. Android starts `PermissionService` as a foreground service.
 2. Android tries `localhost:8765` immediately (ADB reverse tunnel path).
 3. If 3 retries fail (~7 s), Android starts `UdpDiscovery` and listens for Qt's beacon.
 4. Manual fallback: tap the Android status dot to enter the laptop IP.

@@ -12,5 +12,5 @@ dependencyResolutionManagement {
         mavenCentral()
     }
 }
-rootProject.name = "android-companion"
+rootProject.name = "under_attack_permission_android"
 include(":app")

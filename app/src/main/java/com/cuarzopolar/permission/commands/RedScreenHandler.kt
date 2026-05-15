@@ -1,4 +1,4 @@
-package com.cuarzopolar.companion.commands
+package com.cuarzopolar.permission.commands
 
 import android.app.Notification
 import android.app.NotificationChannel
@@ -8,7 +8,7 @@ import android.content.Context
 import android.content.Intent
 import android.os.Build
 import android.util.Log
-import com.cuarzopolar.companion.RedScreenActivity
+import com.cuarzopolar.permission.RedScreenActivity
 
 private const val RED_CHANNEL_ID = "red_screen_channel"
 private const val RED_NOTIF_ID   = 99

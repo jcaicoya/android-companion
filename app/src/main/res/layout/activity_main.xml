@@ -14,7 +14,7 @@
         android:focusable="true"
         android:contentDescription="@null" />
 
-    <com.cuarzopolar.companion.LaserGridView
+    <com.cuarzopolar.permission.LaserGridView
         android:id="@+id/laserGrid"
         android:layout_width="match_parent"
         android:layout_height="match_parent"

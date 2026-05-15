@@ -1,4 +1,4 @@
-package com.cuarzopolar.companion.capture
+package com.cuarzopolar.permission.capture
 
 import android.content.Context
 import android.graphics.Bitmap

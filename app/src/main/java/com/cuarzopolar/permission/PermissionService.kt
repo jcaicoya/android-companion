@@ -1,4 +1,4 @@
-package com.cuarzopolar.companion
+package com.cuarzopolar.permission
 
 import android.Manifest
 import android.app.Notification
@@ -20,29 +20,29 @@ import androidx.core.app.ServiceCompat
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.LifecycleService
 import androidx.lifecycle.lifecycleScope
-import com.cuarzopolar.companion.capture.CameraCapture
-import com.cuarzopolar.companion.capture.SpeechManager
-import com.cuarzopolar.companion.capture.VideoStreamManager
-import com.cuarzopolar.companion.commands.CommandHandler
-import com.cuarzopolar.companion.network.ConnectionState
-import com.cuarzopolar.companion.network.MessageDispatcher
-import com.cuarzopolar.companion.network.UdpDiscovery
-import com.cuarzopolar.companion.network.WebSocketManager
+import com.cuarzopolar.permission.capture.CameraCapture
+import com.cuarzopolar.permission.capture.SpeechManager
+import com.cuarzopolar.permission.capture.VideoStreamManager
+import com.cuarzopolar.permission.commands.CommandHandler
+import com.cuarzopolar.permission.network.ConnectionState
+import com.cuarzopolar.permission.network.MessageDispatcher
+import com.cuarzopolar.permission.network.UdpDiscovery
+import com.cuarzopolar.permission.network.WebSocketManager
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
 
-private const val TAG = "CompanionService"
-private const val CHANNEL_ID = "companion_channel"
-private const val CHANNEL_PRIORITY_ID = "companion_priority_channel"
+private const val TAG = "PermissionService"
+private const val CHANNEL_ID = "permission_channel"
+private const val CHANNEL_PRIORITY_ID = "permission_priority_channel"
 private const val NOTIF_ID = 1
 private const val NOTIF_BRING_TO_FRONT_ID = 2
 private const val REQUEST_CODE_BRING_TO_FRONT = 100
 
-class CompanionService : LifecycleService() {
+class PermissionService : LifecycleService() {
 
     inner class LocalBinder : Binder() {
-        fun getService(): CompanionService = this@CompanionService
+        fun getService(): PermissionService = this@PermissionService
     }
 
     private val binder = LocalBinder()
@@ -229,13 +229,13 @@ class CompanionService : LifecycleService() {
     }
 
     fun connect(ip: String) {
-        getSharedPreferences("companion_prefs", Context.MODE_PRIVATE)
+        getSharedPreferences("permission_prefs", Context.MODE_PRIVATE)
             .edit().putString("last_ip", ip).apply()
         wsManager.connect(ip)
     }
 
     fun disconnect() {
-        getSharedPreferences("companion_prefs", Context.MODE_PRIVATE)
+        getSharedPreferences("permission_prefs", Context.MODE_PRIVATE)
             .edit().remove("last_ip").apply()
         wsManager.disconnect()
     }
@@ -253,7 +253,7 @@ class CompanionService : LifecycleService() {
 
     fun isDeviceAdmin(): Boolean {
         val dpm = getSystemService(Context.DEVICE_POLICY_SERVICE) as DevicePolicyManager
-        val comp = ComponentName(this, CompanionDeviceAdminReceiver::class.java)
+        val comp = ComponentName(this, PermissionDeviceAdminReceiver::class.java)
         return dpm.isAdminActive(comp)
     }
 
@@ -318,7 +318,7 @@ class CompanionService : LifecycleService() {
     }
 
     private fun resetLiveEffectsOnDisconnect() {
-        Log.d(TAG, "Connection lost; returning companion to normal mode")
+        Log.d(TAG, "Connection lost; returning permission target to normal mode")
         speechManager.stop()
         microphoneActive = false
         isStreamActive = false
@@ -331,7 +331,7 @@ class CompanionService : LifecycleService() {
     private fun createNotificationChannel() {
         val nm = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
         nm.createNotificationChannel(
-            NotificationChannel(CHANNEL_ID, "CuarzoPolar Companion", NotificationManager.IMPORTANCE_LOW).apply {
+            NotificationChannel(CHANNEL_ID, "CuarzoPolar Permission", NotificationManager.IMPORTANCE_LOW).apply {
                 setSound(null, null)
                 enableVibration(false)
                 description = "Mantiene la conexión con la consola del operador"
