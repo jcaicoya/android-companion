@@ -13,6 +13,13 @@
       "date": "2026-05-16T10:50:39",
       "message": "Rename package-release.ps1 to package_release.ps1 (snake_case)",
       "apk": "under_attack_permission_android-v01.apk"
+    },
+    {
+      "version": 2,
+      "commit": "c9c9ae3",
+      "date": "2026-05-16T11:31:51",
+      "message": "Refresh permission Android launcher icon",
+      "apk": "under_attack_permission_android-v02.apk"
     }
   ]
 }
