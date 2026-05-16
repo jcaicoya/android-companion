@@ -5,7 +5,10 @@ param(
 $ErrorActionPreference = "Stop"
 
 $root = $PSScriptRoot
-$distDir = Join-Path $root "dist"
+$workspaceRoot = Split-Path $root -Parent
+$projectName = Split-Path $root -Leaf
+$distRoot = Join-Path $workspaceRoot "dist_android"
+$distDir = Join-Path $distRoot $projectName
 $releasesFile = Join-Path $root "releases.json"
 $staging = Join-Path $root "_staging_release"
 
@@ -42,17 +45,19 @@ if (-not (Test-Path $releasesFile)) {
 $data = Get-Content $releasesFile | ConvertFrom-Json
 $releases = @($data.releases)
 $last = if ($releases.Count -gt 0) { $releases[-1] } else { $null }
-
-if (-not $Force -and $last -and $last.commit -eq $commitShort) {
-    Write-Host "Already packaged as $($last.apk). Nothing to do."
-    Write-Host "Use -Force to repackage the same commit."
-    exit 0
-}
-
-$versionNum = if ($releases.Count -eq 0) { 0 } else { [int]$last.version + 1 }
+$alreadyPackaged = $last -and $last.commit -eq $commitShort
+$versionNum = if ($alreadyPackaged) { [int]$last.version } elseif ($releases.Count -eq 0) { 0 } else { [int]$last.version + 1 }
 $versionTag = "v{0:D2}" -f $versionNum
 $apkName = "$apkBaseName-$versionTag.apk"
 $apkPath = Join-Path $distDir $apkName
+$stableApkPath = Join-Path $distDir "app-release.apk"
+$shouldPublishRelease = $Force -or (-not $alreadyPackaged) -or (-not (Test-Path $distDir))
+
+if (-not $shouldPublishRelease) {
+    Write-Host "Already packaged as $($last.apk) and published to $distDir. Nothing to do."
+    Write-Host "Use -Force to republish the same commit."
+    exit 0
+}
 
 Write-Host ""
 Write-Host "=== Packaging $versionTag ==="
@@ -96,22 +101,27 @@ $metadata | ConvertTo-Json -Depth 5 | Set-Content (Join-Path $staging "version.j
     "apk=$($metadata.apk)"
 ) | Set-Content (Join-Path $staging "BUILD_INFO.txt") -Encoding UTF8
 
-if (-not (Test-Path $distDir)) { New-Item -ItemType Directory -Path $distDir | Out-Null }
+if (-not (Test-Path $distRoot)) { New-Item -ItemType Directory -Path $distRoot | Out-Null }
+if (Test-Path $distDir) { Remove-Item -LiteralPath $distDir -Recurse -Force }
+New-Item -ItemType Directory -Path $distDir | Out-Null
 Copy-Item -LiteralPath $apkSource -Destination $apkPath -Force
+Copy-Item -LiteralPath $apkSource -Destination $stableApkPath -Force
 Copy-Item (Join-Path $staging "version.json") (Join-Path $distDir "version.json") -Force
 Copy-Item (Join-Path $staging "BUILD_INFO.txt") (Join-Path $distDir "BUILD_INFO.txt") -Force
 Remove-Item -LiteralPath $staging -Recurse -Force
 
-$entry = [PSCustomObject]@{
-    version = $versionNum
-    commit  = $commitShort
-    date    = $entryDate
-    message = $commitMsg
-    apk     = $apkName
+if (-not $alreadyPackaged) {
+    $entry = [PSCustomObject]@{
+        version = $versionNum
+        commit  = $commitShort
+        date    = $entryDate
+        message = $commitMsg
+        apk     = $apkName
+    }
+    $releases += $entry
+    $data.releases = $releases
+    $data | ConvertTo-Json -Depth 5 | Set-Content $releasesFile -Encoding UTF8
 }
-$releases += $entry
-$data.releases = $releases
-$data | ConvertTo-Json -Depth 5 | Set-Content $releasesFile -Encoding UTF8
 
 if ($hasGit) {
     Write-Host ">> Tagging commit as $versionTag..."
@@ -128,5 +138,5 @@ Write-Host "  App     : $appName"
 Write-Host "  Version : $versionTag"
 Write-Host "  Commit  : $commitShort - $commitMsg"
 Write-Host "  APK     : $apkName ($sizeMB MB)"
-Write-Host "  Path    : $apkPath"
+Write-Host "  Path    : $distDir"
 Write-Host ""
