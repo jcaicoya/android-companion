@@ -6,6 +6,13 @@
       "date": "2026-05-15T18:57:57",
       "message": "Fix app name to Permission; update launcher icon (cuarzito_green, dark background)",
       "apk": "under_attack_permission_android-v00.apk"
+    },
+    {
+      "version": 1,
+      "commit": "411699f",
+      "date": "2026-05-16T10:50:39",
+      "message": "Rename package-release.ps1 to package_release.ps1 (snake_case)",
+      "apk": "under_attack_permission_android-v01.apk"
     }
   ]
 }
