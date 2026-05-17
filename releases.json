@@ -20,6 +20,13 @@
       "date": "2026-05-16T11:31:51",
       "message": "Refresh permission Android launcher icon",
       "apk": "under_attack_permission_android-v02.apk"
+    },
+    {
+      "version": 3,
+      "commit": "36b3c59",
+      "date": "2026-05-17T11:59:56",
+      "message": "Standardize project docs",
+      "apk": "under_attack_permission_android-v03.apk"
     }
   ]
 }
